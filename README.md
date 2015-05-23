@@ -2,7 +2,7 @@
 Python library using ctypes to search/edit windows programs memory
 
 #usage examples :
-in this example open a notepad.exe (x32) and type in some text we will edit from memory !
+In this example open a notepad.exe (x32) and type in some text we will edit from memory !
 ```python
 >>> from memorpy import *
 >>> mw=MemWorker("notepad")
@@ -56,7 +56,7 @@ u'hello this is a message I typed in notepad.exe !\x00\x00'
 >>> a.read(100).decode("utf-16-le")
 u'pwned this is a message I typed in notepad.exe !\x00\x00'
 ```
-look back at your notepad and the text should be changed ! :)
+Look back at your notepad and the text should be changed ! :)
 A quicker way to do this could be :
 ```python
 >>> mw.umem_replace("hello","pwned")
@@ -73,7 +73,7 @@ Some other interesting features like searching for different values types in mem
 <Addr: 0x0018FDE6>,
 ...]}
 ```
-use some ammo and "refeed" the locator (do this a couple of times until there is one result left)
+Use some ammo and "refeed" the locator (do this a couple of times until there is one result left)
 ```python
 >>> lo.feed(199)
 {'double': [],
@@ -90,8 +90,9 @@ use some ammo and "refeed" the locator (do this a couple of times until there is
 >>>a.write(999999)
 1
 ```
-now you have infinite ammo :o)
+Now you have infinite ammo :o)
 
-I hope this code will be useful to someone
+
+I hope this code will be useful to someone.
 
 Have fun !
