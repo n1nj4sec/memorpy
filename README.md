@@ -91,5 +91,7 @@ use some ammo and "refeed" the locator (do this a couple of times until there is
 1
 ```
 now you have infinite ammo :o)
+
 I hope this code will be useful to someone
+
 Have fun !
