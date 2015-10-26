@@ -1,5 +1,5 @@
 # memorpy
-Python library using ctypes to search/edit windows programs memory
+Python library using ctypes to search/edit windows programs memory. Some functions are not implemented as I only implemented what I needed at the time I wrote this ;) But the basic functions should works just fine
 
 #usage examples :
 In this example open a notepad.exe (x32) and type in some text we will edit from memory !
@@ -96,3 +96,11 @@ Now you have infinite ammo :o)
 I hope this code will be useful to someone.
 
 Have fun !
+
+## Contact
+by mail: contact@n1nj4.eu  
+on Twitter: [Follow me on twitter](https://twitter.com/n1nj4sec)  
+
+If some of you want to participate or send me a feedback, don't hesitate :-)  
+  
+This project is a personal development, please respect its philosophy don't use it for evil purpose !
