@@ -14,17 +14,23 @@
 # You should have received a copy of the GNU General Public License
 # along with memorpy.  If not, see <http://www.gnu.org/licenses/>.
 
-from ctypes import pointer, sizeof, windll, create_string_buffer, c_ulong, byref
+from ctypes import pointer, sizeof, windll, create_string_buffer, c_ulong, byref, GetLastError, c_bool, WinError
 from structures import *
 import copy
 import struct
 import utils
-import win32api
 import win32security
+import win32api
+import platform
 
 class ProcessException(Exception):
     pass
 
+IsWow64Process=None
+if hasattr(windll.kernel32,'IsWow64Process'):
+    IsWow64Process=windll.kernel32.IsWow64Process
+    IsWow64Process.restype = c_bool
+    IsWow64Process.argtypes = [c_void_p, POINTER(c_bool)]
 
 class Process(object):
 
@@ -38,6 +44,16 @@ class Process(object):
 
     def __del__(self):
         self.close()
+
+    def is_64bit(self):
+        if not "64" in platform.machine():
+            return False
+        iswow64 = c_bool(False)
+        if IsWow64Process is None:
+            return False
+        if not IsWow64Process(self.h_process, byref(iswow64)):
+            raise WinError()
+        return not iswow64.value
 
     def list(self):
         """
@@ -108,6 +124,7 @@ class Process(object):
 
     def open_debug(self, dwProcessId):
         process = OpenProcess(262144, 0, dwProcessId)
+        #info = win32security.GetSecurityInfo(windll.kernel32.GetCurrentProcess(), 6, 0)
         info = win32security.GetSecurityInfo(win32api.GetCurrentProcess(), 6, 0)
         win32security.SetSecurityInfo(process, 6, win32security.DACL_SECURITY_INFORMATION | win32security.UNPROTECTED_DACL_SECURITY_INFORMATION, None, None, info.GetSecurityDescriptorDacl(), info.GetSecurityDescriptorGroup())
         CloseHandle(process)
@@ -123,9 +140,20 @@ class Process(object):
         windll.kernel32.GetSystemInfo(byref(si))
         return si
 
+    def GetNativeSystemInfo(self):
+        si = SYSTEM_INFO()
+        windll.kernel32.GetNativeSystemInfo(byref(si))
+        return si
+
     def VirtualQueryEx(self, lpAddress):
         mbi = MEMORY_BASIC_INFORMATION()
-        if not windll.kernel32.VirtualQueryEx(self.h_process, lpAddress, byref(mbi), sizeof(mbi)):
+        if not VirtualQueryEx(self.h_process, lpAddress, byref(mbi), sizeof(mbi)):
+            raise ProcessException('Error VirtualQueryEx: 0x%08X' % lpAddress)
+        return mbi
+
+    def VirtualQueryEx64(self, lpAddress):
+        mbi = MEMORY_BASIC_INFORMATION64()
+        if not VirtualQueryEx64(self.h_process, lpAddress, byref(mbi), sizeof(mbi)):
             raise ProcessException('Error VirtualQueryEx: 0x%08X' % lpAddress)
         return mbi
 
@@ -157,32 +185,42 @@ class Process(object):
 
         return res
 
-    def read_bytes(self, address, bytes = 4):
+    def read_bytes(self, address, bytes = 4, use_NtWow64ReadVirtualMemory64=False):
+        #print "reading %s bytes from addr %s"%(bytes, address)
+        if use_NtWow64ReadVirtualMemory64:
+            if NtWow64ReadVirtualMemory64 is None:
+                raise WindowsError("NtWow64ReadVirtualMemory64 is not available from a 64bit process")
+            RpM=NtWow64ReadVirtualMemory64
+        else:
+            RpM=ReadProcessMemory
+
         address = int(address)
         if not self.isProcessOpen:
             raise ProcessException("Can't read_bytes(%s, bytes=%s), process %s is not open" % (address, bytes, self.pid))
+        #print "creating buf: %s"%bytes
         buffer = create_string_buffer(bytes)
-        bytesread = c_ulong(0)
+        bytesread = c_size_t(0)
         data = ''
         length = bytes
         _address = address
         _length = length
         while length:
-            if not windll.kernel32.ReadProcessMemory(self.h_process, address, buffer, bytes, byref(bytesread)):
+            if RpM(self.h_process, address, buffer, bytes, byref(bytesread)) or (use_NtWow64ReadVirtualMemory64 and GetLastError()==0):
                 if bytesread.value:
                     data += buffer.raw[:bytesread.value]
                     length -= bytesread.value
                     address += bytesread.value
                 if not len(data):
-                    raise ProcessException('Error %s in ReadProcessMemory(%08x, %d, read=%d)' % (win32api.GetLastError(),
+                    raise ProcessException('Error %s in ReadProcessMemory(%08x, %d, read=%d)' % (GetLastError(),
                      address,
                      length,
                      bytesread.value))
                 return data
+            else:
+                raise WinError()
             data += buffer.raw[:bytesread.value]
             length -= bytesread.value
             address += bytesread.value
-
         return data
 
     def read(self, address, type = 'uint', maxlen = 50):
