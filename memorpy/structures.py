@@ -14,29 +14,45 @@
 # You should have received a copy of the GNU General Public License
 # along with memorpy.  If not, see <http://www.gnu.org/licenses/>.
 
-from ctypes import Structure, c_long, c_int, c_uint, c_char, c_void_p, c_ubyte, c_ushort, c_ulong, windll, POINTER, wintypes
+from ctypes import Structure, c_long, c_int, c_uint, c_char, c_void_p, c_ubyte, c_ushort, c_ulong, c_ulonglong, windll, POINTER, sizeof, c_bool, c_size_t, c_longlong
+from ctypes.wintypes import *
 
-BYTE = c_ubyte
-WORD = c_ushort
-DWORD = c_ulong
+if sizeof(c_void_p) == 8:
+    ULONG_PTR = c_ulonglong
+else:
+    ULONG_PTR = c_ulong
+
 
 class MEMORY_BASIC_INFORMATION(Structure):
-    _fields_ = [('BaseAddress', c_ulong),
-     ('AllocationBase', c_ulong),
-     ('AllocationProtect', c_ulong),
-     ('RegionSize', c_ulong),
-     ('State', c_ulong),
-     ('Protect', c_ulong),
-     ('Type', c_ulong)]
+    _fields_ = [('BaseAddress', c_void_p),
+     ('AllocationBase', c_void_p),
+     ('AllocationProtect', DWORD),
+     ('RegionSize', c_size_t),
+     ('State', DWORD),
+     ('Protect', DWORD),
+     ('Type', DWORD)]
+
+# https://msdn.microsoft.com/fr-fr/library/windows/desktop/aa366775(v=vs.85).aspx
+class MEMORY_BASIC_INFORMATION64(Structure):
+    _fields_ = [('BaseAddress', c_ulonglong),
+     ('AllocationBase', c_ulonglong),
+     ('AllocationProtect', DWORD),
+     ('alignement1', DWORD),
+     ('RegionSize', c_ulonglong),
+     ('State', DWORD),
+     ('Protect', DWORD),
+     ('Type', DWORD),
+     ('alignement2', DWORD)]
+
 
 
 class SYSTEM_INFO(Structure):
     _fields_ = [('wProcessorArchitecture', WORD),
      ('wReserved', WORD),
      ('dwPageSize', DWORD),
-     ('lpMinimumApplicationAddress', DWORD),
-     ('lpMaximumApplicationAddress', DWORD),
-     ('dwActiveProcessorMask', DWORD),
+     ('lpMinimumApplicationAddress', LPVOID),
+     ('lpMaximumApplicationAddress', LPVOID),
+     ('dwActiveProcessorMask', ULONG_PTR),
      ('dwNumberOfProcessors', DWORD),
      ('dwProcessorType', DWORD),
      ('dwAllocationGranularity', DWORD),
@@ -53,7 +69,8 @@ class PROCESSENTRY32(Structure):
      ('cntThreads', c_uint),
      ('th32ParentProcessID', c_uint),
      ('pcPriClassBase', c_long),
-     ('dwFlags', c_uint),
+     ('dwFlags', DWORD),
+     #('dwFlags', ULONG_PTR),
      ('szExeFile', c_char * 260),
      ('th32MemoryBase', c_long),
      ('th32AccessKey', c_long)]
@@ -118,8 +135,27 @@ OpenProcess = windll.kernel32.OpenProcess
 OpenProcess.argtypes = [c_void_p, c_int, c_long]
 OpenProcess.rettype = c_long
 OpenProcessToken = windll.advapi32.OpenProcessToken
-OpenProcessToken.argtypes = (wintypes.HANDLE, wintypes.DWORD, POINTER(wintypes.HANDLE))
-OpenProcessToken.restype = wintypes.BOOL
+OpenProcessToken.argtypes = (HANDLE, DWORD, POINTER(HANDLE))
+OpenProcessToken.restype = BOOL
+
+ReadProcessMemory = windll.kernel32.ReadProcessMemory
+ReadProcessMemory.argtypes = [HANDLE, LPCVOID, LPVOID, c_size_t, POINTER(c_size_t)]
+ReadProcessMemory.restype = BOOL
+
+if sizeof(c_void_p) == 8:
+    NtWow64ReadVirtualMemory64=None
+else:
+    NtWow64ReadVirtualMemory64 = windll.ntdll.NtWow64ReadVirtualMemory64
+    NtWow64ReadVirtualMemory64.argtypes = [HANDLE, c_longlong, LPVOID, c_ulonglong, POINTER(c_ulong)] # NTSTATUS (__stdcall *NtWow64ReadVirtualMemory64)(HANDLE ProcessHandle, PVOID64 BaseAddress, PVOID Buffer, ULONGLONG BufferSize, PULONGLONG NumberOfBytesRead);
+    NtWow64ReadVirtualMemory64.restype = BOOL
+
+VirtualQueryEx = windll.kernel32.VirtualQueryEx
+VirtualQueryEx.argtypes = [HANDLE, LPCVOID, POINTER(MEMORY_BASIC_INFORMATION), c_size_t]
+VirtualQueryEx.restype = c_size_t
+
+#VirtualQueryEx64 = windll.kernel32.VirtualQueryEx
+#VirtualQueryEx64.argtypes = [HANDLE, LPCVOID, POINTER(MEMORY_BASIC_INFORMATION64), c_size_t]
+#VirtualQueryEx64.restype = c_size_t
 
 PAGE_EXECUTE_READWRITE = 64
 PAGE_EXECUTE_READ = 32

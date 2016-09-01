@@ -23,23 +23,43 @@ import struct
 from Address import Address
 import binascii
 from structures import *
-logger = logging.getLogger('memorpy')
 
+logger = logging.getLogger('memorpy')
+logger.setLevel(logging.ERROR)
+ch = logging.StreamHandler()
+ch.setLevel(logging.ERROR)
+logger.addHandler(ch)
+
+
+    
 class MemWorker(object):
 
-    def __init__(self, process_name, end_offset = None, start_offset = None):
-        logger.info('opening process %s ...' % process_name)
+    def __init__(self, pid=None, name=None, end_offset = None, start_offset = None):
         self.process = Process.Process()
-        self.process.open_debug_from_name(process_name)
-        si = self.process.GetSystemInfo()
+        if pid is not None:
+            logger.info('opening process with pid %s ...' % pid)
+            self.process.open_debug(pid)
+        elif name is not None:
+            logger.info('opening process %s ...' % name)
+            self.process.open_debug_from_name(name)
+        else:
+            raise NameError("At least pid or name should be supplied")
+        if self.process.is_64bit():
+            si=self.process.GetNativeSystemInfo()
+            max_addr=si.lpMaximumApplicationAddress
+        else:
+            si=self.process.GetSystemInfo()
+            max_addr=2147418111
+        min_addr=si.lpMinimumApplicationAddress
+        #print "GetSystemInfo: %s %s"%(si.lpMinimumApplicationAddress, si.lpMaximumApplicationAddress)
         if end_offset:
             self.end_offset = end_offset
         else:
-            self.end_offset = si.lpMaximumApplicationAddress
+            self.end_offset = max_addr
         if start_offset:
             self.start_offset = start_offset
         else:
-            self.start_offset = si.lpMinimumApplicationAddress
+            self.start_offset = min_addr
 
     def Address(self, value, default_type = 'uint'):
         """ wrapper to instanciate an Address class for the memworker.process"""
@@ -109,6 +129,7 @@ class MemWorker(object):
                 regex = value
         if start_offset is None:
             offset = self.start_offset
+            start_offset=self.start_offset
         else:
             offset = start_offset
         if end_offset is None:
@@ -127,6 +148,7 @@ class MemWorker(object):
             chunk = mbi.RegionSize
             protect = mbi.Protect
             state = mbi.State
+            #print "offset: %s, chunk:%s"%(offset, chunk)
             if state & MEM_FREE or state & MEM_RESERVE:
                 offset += chunk
                 continue
@@ -135,13 +157,22 @@ class MemWorker(object):
                     offset += chunk
                     continue
             b = ''
-            try:
-                b = self.process.read_bytes(offset, chunk)
-                totalread = len(b)
-            except Exception as e:
-                logger.warning(e)
-                offset += chunk
-                continue
+            totalread=0
+            current_offset=offset
+            chunk_size=10000000
+            chunk_read=0
+            while chunk_read < chunk:
+                try:
+                    if chunk_size>chunk:
+                        chunk_size=chunk
+                    b += self.process.read_bytes(current_offset, chunk_size)
+                    totalread += chunk_size
+                except Exception as e:
+                    logger.warning(e)
+                    continue
+                finally:
+                    current_offset +=chunk_size
+                    chunk_read += chunk_size
 
             if b:
                 if ftype == 're':
