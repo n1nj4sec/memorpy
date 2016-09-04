@@ -5,7 +5,7 @@ Python library using ctypes to search/edit windows programs memory. Some functio
 In this example open a notepad.exe (x32) and type in some text we will edit from memory !
 ```python
 >>> from memorpy import *
->>> mw=MemWorker("notepad")
+>>> mw=MemWorker(pid=3856) #you can also select a process by its name with the kwarg name=
 >>> l=[x for x in mw.umem_search("hello")]
 >>> l
 [<Addr: 0x003287B0>]
