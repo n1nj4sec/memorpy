@@ -19,28 +19,44 @@ from structures import *
 import copy
 import struct
 import utils
+import platform
 import win32security
 import win32api
-import platform
 
 class ProcessException(Exception):
     pass
 
+psapi = windll.psapi
+kernel32 = windll.kernel32
+
 IsWow64Process=None
-if hasattr(windll.kernel32,'IsWow64Process'):
-    IsWow64Process=windll.kernel32.IsWow64Process
+if hasattr(kernel32,'IsWow64Process'):
+    IsWow64Process=kernel32.IsWow64Process
     IsWow64Process.restype = c_bool
     IsWow64Process.argtypes = [c_void_p, POINTER(c_bool)]
 
+
 class Process(object):
 
-    def __init__(self):
+    def __init__(self, pid=None, name=None, debug=True):
+        """ Create and Open a process object from its pid or from its name """
         self.h_process = None
         self.pid = None
         self.isProcessOpen = False
-        self.process32 = None
         self.buffer = None
         self.bufferlen = 0
+        if pid is not None:
+            if debug:
+                self._open(int(pid), debug=True)
+            else:
+                self._open(int(pid), debug=False)
+        elif name is not None:
+            if debug:
+                self._open_from_name(name, debug=True)
+            else:
+                self._open_from_name(name, debug=False)
+        else:
+            raise ValueError("You need to instanciate process with at least a name or a pid")
 
     def __del__(self):
         self.close()
@@ -55,53 +71,63 @@ class Process(object):
             raise WinError()
         return not iswow64.value
 
-    def list(self):
-        """
-        return a list of <PROCESSENTRY32>
-        """
-        processes = []
-        hProcessSnap = CreateToolhelp32Snapshot(TH32CS_CLASS.SNAPPROCESS, 0)
-        pe32 = PROCESSENTRY32()
-        pe32.dwSize = sizeof(PROCESSENTRY32)
-        ret = Process32First(hProcessSnap, pointer(pe32))
-        while ret:
-            ret = Process32Next(hProcessSnap, pointer(pe32))
-            if pe32.dwFlags == 0:
-                processes.append(copy.copy(pe32))
-            else:
-                break
+    @staticmethod
+    def list():
+        processes=[]
+        arr = c_ulong * 256
+        lpidProcess= arr()
+        cb = sizeof(lpidProcess)
+        cbNeeded = c_ulong()
+        hModule = c_ulong()
+        count = c_ulong()
+        modname = create_string_buffer(100)
+        PROCESS_QUERY_INFORMATION = 0x0400
+        PROCESS_VM_READ = 0x0010
 
-        CloseHandle(hProcessSnap)
+        psapi.EnumProcesses(byref(lpidProcess), cb, byref(cbNeeded))
+        nReturned = cbNeeded.value/sizeof(c_ulong())
+
+        pidProcess = [i for i in lpidProcess][:nReturned]
+        for pid in pidProcess:
+            proc={ "pid": int(pid) }
+            hProcess = kernel32.OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, False, pid)
+            if hProcess:
+                psapi.EnumProcessModules(hProcess, byref(hModule), sizeof(hModule), byref(count))
+                psapi.GetModuleBaseNameA(hProcess, hModule.value, modname, sizeof(modname))
+                proc["name"]=modname.value
+                kernel32.CloseHandle(hProcess)
+            processes.append(proc)
         return processes
 
-    def name_from_process(self, dwProcessId):
-        process_list = self.list()
-        for process in process_list:
-            if process.th32ProcessID == dwProcessId:
-                return process.szExeFile[:-4]
-
-        return False
-
-    def process32_from_id(self, dwProcessId):
-        process_list = self.list()
-        for process in process_list:
-            if process.th32ProcessID == dwProcessId:
-                return process
-
-    def process_from_name(self, processName):
+    @staticmethod
+    def processes_from_name(processName):
         processes = []
-        for process in self.list():
-            if processName == process.szExeFile[:-4]:
+        for process in Process.list():
+            if processName == process.get("name", None) or (process.get("name","").lower().endswith(".exe") and process.get("name","")[:-4]==processName):
                 processes.append(process)
 
         if len(processes) > 0:
             return processes
 
-    def open(self, dwProcessId):
+    @staticmethod
+    def name_from_process(dwProcessId):
+        process_list = Process.list()
+        for process in process_list:
+            if process.pid == dwProcessId:
+                return process.get("name", None)
+
+        return False
+
+    def _open(self, dwProcessId, debug=False):
+        if debug:
+            process = OpenProcess(262144, 0, dwProcessId)
+            info = win32security.GetSecurityInfo(kernel32.GetCurrentProcess(), 6, 0)
+            win32security.SetSecurityInfo(process, 6, win32security.DACL_SECURITY_INFORMATION | win32security.UNPROTECTED_DACL_SECURITY_INFORMATION, None, None, info.GetSecurityDescriptorDacl(), info.GetSecurityDescriptorGroup())
+            CloseHandle(process)
         self.h_process = OpenProcess(2035711, 0, dwProcessId)
         if self.h_process is not None:
             self.isProcessOpen = True
-            self.process32 = self.process32_from_id(dwProcessId)
+            self.pid=dwProcessId
             return True
         return False
 
@@ -112,37 +138,28 @@ class Process(object):
                 self.h_process = None
                 self.pid = None
                 self.isProcessOpen = False
-                self.process32 = None
             return ret
         return False
 
-    def open_debug_from_name(self, processName):
-        dwProcessId = self.process_from_name(processName)
-        if not dwProcessId:
+    def _open_from_name(self, processName, debug=False):
+        processes = self.processes_from_name(processName)
+        if not processes:
             raise ProcessException("can't get pid from name %s" % processName)
-        self.open_debug(dwProcessId[0].th32ProcessID)
-
-    def open_debug(self, dwProcessId):
-        process = OpenProcess(262144, 0, dwProcessId)
-        #info = win32security.GetSecurityInfo(windll.kernel32.GetCurrentProcess(), 6, 0)
-        info = win32security.GetSecurityInfo(win32api.GetCurrentProcess(), 6, 0)
-        win32security.SetSecurityInfo(process, 6, win32security.DACL_SECURITY_INFORMATION | win32security.UNPROTECTED_DACL_SECURITY_INFORMATION, None, None, info.GetSecurityDescriptorDacl(), info.GetSecurityDescriptorGroup())
-        CloseHandle(process)
-        self.h_process = OpenProcess(2035711, 0, dwProcessId)
-        if self.h_process:
-            self.isProcessOpen = True
-            self.process32 = self.process32_from_id(dwProcessId)
-            return True
-        return False
+        elif len(processes)>1:
+            raise ValueError("There is multiple processes with name %s. Please select a process from its pid instead"%processName)
+        if debug:
+            self._open(processes[0]["pid"], debug=True)
+        else:
+            self._open(processes[0]["pid"], debug=False)
 
     def GetSystemInfo(self):
         si = SYSTEM_INFO()
-        windll.kernel32.GetSystemInfo(byref(si))
+        kernel32.GetSystemInfo(byref(si))
         return si
 
     def GetNativeSystemInfo(self):
         si = SYSTEM_INFO()
-        windll.kernel32.GetNativeSystemInfo(byref(si))
+        kernel32.GetNativeSystemInfo(byref(si))
         return si
 
     def VirtualQueryEx(self, lpAddress):
@@ -159,7 +176,7 @@ class Process(object):
 
     def VirtualProtectEx(self, base_address, size, protection):
         old_protect = c_ulong(0)
-        if not windll.kernel32.VirtualProtectEx(self.h_process, base_address, size, protection, byref(old_protect)):
+        if not kernel32.VirtualProtectEx(self.h_process, base_address, size, protection, byref(old_protect)):
             raise ProcessException('Error: VirtualProtectEx(%08X, %d, %08X)' % (base_address, size, protection))
         return old_protect.value
 
@@ -168,7 +185,7 @@ class Process(object):
         if not self.isProcessOpen:
             raise ProcessException("Can't write_bytes(%s, %s), process %s is not open" % (address, data, self.pid))
         buffer = create_string_buffer(data)
-        sizeWriten = c_ulong(0)
+        sizeWriten = c_size_t(0)
         bufferSize = sizeof(buffer) - 1
         _address = address
         _length = bufferSize + 1
@@ -177,7 +194,7 @@ class Process(object):
         except:
             pass
 
-        res = windll.kernel32.WriteProcessMemory(self.h_process, address, buffer, bufferSize, byref(sizeWriten))
+        res = kernel32.WriteProcessMemory(self.h_process, address, buffer, bufferSize, byref(sizeWriten))
         try:
             self.VirtualProtectEx(_address, _length, old_protect)
         except:
@@ -245,6 +262,22 @@ class Process(object):
             return self.write_bytes(int(address), struct.pack(s, data))
         else:
             return self.write_bytes(int(address), data)
+   
+    def list_modules(self):
+        module_list = []
+        if self.pid is not None:
+            hModuleSnap = CreateToolhelp32Snapshot(TH32CS_CLASS.SNAPMODULE, self.pid)
+            if hModuleSnap is not None:
+                module_entry = MODULEENTRY32()
+                module_entry.dwSize = sizeof(module_entry)
+                success = Module32First(hModuleSnap, byref(module_entry))
+                while success:
+                    if module_entry.th32ProcessID == self.pid:
+                        module_list.append(copy.copy(module_entry))
+                    success = Module32Next(hModuleSnap, byref(module_entry))
+
+                CloseHandle(hModuleSnap)
+        return module_list
 
     def get_symbolic_name(self, address):
         for m in self.list_modules():
@@ -253,25 +286,6 @@ class Process(object):
 
         return '0x%08X' % int(address)
 
-    def list_modules(self):
-        """
-        return a list of <MODULEENTRY32>
-        """
-        module_list = []
-        if self.process32 is not None:
-            hModuleSnap = CreateToolhelp32Snapshot(TH32CS_CLASS.SNAPMODULE, self.process32.th32ProcessID)
-            if hModuleSnap is not None:
-                module_entry = MODULEENTRY32()
-                module_entry.dwSize = sizeof(module_entry)
-                success = Module32First(hModuleSnap, byref(module_entry))
-                while success:
-                    if module_entry.th32ProcessID == self.process32.th32ProcessID:
-                        module_list.append(copy.copy(module_entry))
-                    success = Module32Next(hModuleSnap, byref(module_entry))
-
-                CloseHandle(hModuleSnap)
-        return module_list
-
     def hasModule(self, module):
         if module[-4:] != '.dll':
             module += '.dll'
@@ -279,8 +293,8 @@ class Process(object):
         for m in module_list:
             if module in m.szExePath.split('\\'):
                 return True
-
         return False
+    
 
     def get_instruction(self, address):
         """

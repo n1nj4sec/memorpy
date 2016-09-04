@@ -34,16 +34,8 @@ logger.addHandler(ch)
     
 class MemWorker(object):
 
-    def __init__(self, pid=None, name=None, end_offset = None, start_offset = None):
-        self.process = Process.Process()
-        if pid is not None:
-            logger.info('opening process with pid %s ...' % pid)
-            self.process.open_debug(pid)
-        elif name is not None:
-            logger.info('opening process %s ...' % name)
-            self.process.open_debug_from_name(name)
-        else:
-            raise NameError("At least pid or name should be supplied")
+    def __init__(self, pid=None, name=None, end_offset = None, start_offset = None, debug=True):
+        self.process = Process.Process(name=name, pid=pid, debug=debug)
         if self.process.is_64bit():
             si=self.process.GetNativeSystemInfo()
             max_addr=si.lpMaximumApplicationAddress
@@ -51,7 +43,6 @@ class MemWorker(object):
             si=self.process.GetSystemInfo()
             max_addr=2147418111
         min_addr=si.lpMinimumApplicationAddress
-        #print "GetSystemInfo: %s %s"%(si.lpMinimumApplicationAddress, si.lpMaximumApplicationAddress)
         if end_offset:
             self.end_offset = end_offset
         else:

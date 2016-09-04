@@ -140,7 +140,11 @@ OpenProcessToken.restype = BOOL
 
 ReadProcessMemory = windll.kernel32.ReadProcessMemory
 ReadProcessMemory.argtypes = [HANDLE, LPCVOID, LPVOID, c_size_t, POINTER(c_size_t)]
-ReadProcessMemory.restype = BOOL
+ReadProcessMemory = windll.kernel32.ReadProcessMemory
+
+WriteProcessMemory = windll.kernel32.WriteProcessMemory
+WriteProcessMemory.argtypes = [HANDLE, LPVOID, LPCVOID, c_size_t, POINTER(c_size_t)]
+WriteProcessMemory.restype = BOOL
 
 if sizeof(c_void_p) == 8:
     NtWow64ReadVirtualMemory64=None
