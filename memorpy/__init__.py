@@ -14,9 +14,11 @@
 # You should have received a copy of the GNU General Public License
 # along with memorpy.  If not, see <http://www.gnu.org/licenses/>.
 
+import sys
 from MemWorker import *
 from Locator import *
 from Address import *
 from Process import *
-from wintools import *
 from utils import *
+if sys.platform=="win32":
+    from wintools import *

@@ -29,7 +29,7 @@ class Address(object):
         self.default_type = default_type
         self.symbolic_name = None
 
-    def read(self, type = None, maxlen = None):
+    def read(self, type = None, maxlen = None, errors='raise'):
         if maxlen is None:
             try:
                 int(type)
@@ -41,9 +41,9 @@ class Address(object):
         if not type:
             type = self.default_type
         if not maxlen:
-            return self.process.read(self.value, type=type)
+            return self.process.read(self.value, type=type, errors=errors)
         else:
-            return self.process.read(self.value, type=type, maxlen=maxlen)
+            return self.process.read(self.value, type=type, maxlen=maxlen, errors=errors)
 
     def write(self, data, type = None):
         if not type:

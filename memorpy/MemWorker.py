@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with memorpy.  If not, see <http://www.gnu.org/licenses/>.
-
+import sys
 import string
 import re
 import logging
@@ -36,21 +36,6 @@ class MemWorker(object):
 
     def __init__(self, pid=None, name=None, end_offset = None, start_offset = None, debug=True):
         self.process = Process.Process(name=name, pid=pid, debug=debug)
-        if self.process.is_64bit():
-            si=self.process.GetNativeSystemInfo()
-            max_addr=si.lpMaximumApplicationAddress
-        else:
-            si=self.process.GetSystemInfo()
-            max_addr=2147418111
-        min_addr=si.lpMinimumApplicationAddress
-        if end_offset:
-            self.end_offset = end_offset
-        else:
-            self.end_offset = max_addr
-        if start_offset:
-            self.start_offset = start_offset
-        else:
-            self.start_offset = min_addr
 
     def Address(self, value, default_type = 'uint'):
         """ wrapper to instanciate an Address class for the memworker.process"""
@@ -118,40 +103,18 @@ class MemWorker(object):
                 regex = re.compile(value)
             else:
                 regex = value
-        if start_offset is None:
-            offset = self.start_offset
-            start_offset=self.start_offset
-        else:
-            offset = start_offset
-        if end_offset is None:
-            end_offset = self.end_offset
         if ftype == 'float':
             structtype, structlen = utils.type_unpack(ftype)
         elif ftype != 'match' and ftype != 'group' and ftype != 're':
             structtype, structlen = utils.type_unpack(ftype)
             value = struct.pack(structtype, value)
-        while True:
-            if offset >= end_offset:
-                break
-            totalread = 0
-            mbi = self.process.VirtualQueryEx(offset)
-            offset = mbi.BaseAddress
-            chunk = mbi.RegionSize
-            protect = mbi.Protect
-            state = mbi.State
-            #print "offset: %s, chunk:%s"%(offset, chunk)
-            if state & MEM_FREE or state & MEM_RESERVE:
-                offset += chunk
-                continue
-            if protec:
-                if not protect & protec or protect & PAGE_NOCACHE or protect & PAGE_WRITECOMBINE or protect & PAGE_GUARD:
-                    offset += chunk
-                    continue
+        for offset, chunk in self.process.iter_region(start_offset=start_offset, end_offset=end_offset, protec=protec):
             b = ''
             totalread=0
             current_offset=offset
             chunk_size=10000000
             chunk_read=0
+            chunk_exc=False
             while chunk_read < chunk:
                 try:
                     if chunk_size>chunk:
@@ -160,10 +123,13 @@ class MemWorker(object):
                     totalread += chunk_size
                 except Exception as e:
                     logger.warning(e)
-                    continue
+                    chunk_exc=True
+                    break
                 finally:
                     current_offset +=chunk_size
                     chunk_read += chunk_size
+            if chunk_exc:
+                continue
 
             if b:
                 if ftype == 're':
@@ -194,5 +160,4 @@ class MemWorker(object):
                         yield self.Address(soffset, 'bytes')
                         index = b.find(value, index + 1)
 
-            offset += totalread
 
