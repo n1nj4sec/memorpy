@@ -264,6 +264,9 @@ class WinProcess(BaseProcess):
                      bytesread.value))
                 return data
             else:
+                if GetLastError()==299:#only part of ReadProcessMemory has been done, let's return it
+                    data+=buffer.raw[:bytesread.value]
+                    return data
                 raise WinError()
             data += buffer.raw[:bytesread.value]
             length -= bytesread.value
