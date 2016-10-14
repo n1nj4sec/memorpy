@@ -26,10 +26,6 @@ import binascii
 from structures import *
 
 logger = logging.getLogger('memorpy')
-logger.setLevel(logging.WARNING)
-ch = logging.StreamHandler()
-ch.setLevel(logging.WARNING)
-logger.addHandler(ch)
 
 
     
@@ -123,14 +119,14 @@ class MemWorker(object):
                     b += self.process.read_bytes(current_offset, chunk_size)
                     totalread += chunk_size
                 except IOError as e:
+                    print traceback.format_exc()
                     if e.errno==13:
                         raise
                     else:
-                        logger.info(e)
+                        logger.warning(e)
                     chunk_exc=True
                     break
                 except Exception as e:
-                    print traceback.format_exc()
                     logger.warning(e)
                     chunk_exc=True
                     break

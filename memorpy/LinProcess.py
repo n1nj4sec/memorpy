@@ -19,20 +19,53 @@ import struct
 import utils
 import platform
 import ctypes, re, sys
+from ctypes import create_string_buffer, byref, c_int, c_void_p, c_long, c_size_t, c_ssize_t, POINTER, get_errno
+import errno
 import os
+import time
 from BaseProcess import BaseProcess, ProcessException
 from structures import *
 import logging
-import time
+
+logger = logging.getLogger('memorpy')
 
 libc=ctypes.CDLL("libc.so.6")
+get_errno_loc = libc.__errno_location
+get_errno_loc.restype = POINTER(c_int)
+
+def errcheck(ret, func, args):
+    if ret == -1:
+        _errno = get_errno() or errno.EPERM
+        raise OSError(os.strerror(_errno))
+    return ret
+
 c_ptrace = libc.ptrace
 c_pid_t = ctypes.c_int32 # This assumes pid_t is int32_t
-c_ptrace.argtypes = [ctypes.c_int, c_pid_t, ctypes.c_void_p, ctypes.c_void_p]
-c_ptrace.restype = ctypes.c_long
+c_ptrace.argtypes = [c_int, c_pid_t, c_void_p, c_void_p]
+c_ptrace.restype = c_long
 mprotect = libc.mprotect
-mprotect.restype = ctypes.c_int
-mprotect.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int]
+mprotect.restype = c_int
+mprotect.argtypes = [c_void_p, c_size_t, c_int]
+LARGE_FILE_SUPPORT=False
+try:
+    c_off64_t=ctypes.c_longlong
+    lseek64 = libc.lseek64
+    lseek64.argtypes = [c_int, c_off64_t, c_int]
+    lseek64.errcheck=errcheck
+    open64 = libc.open64
+    open64.restype = c_int
+    open64.argtypes = [c_void_p, c_int]
+    open64.errcheck=errcheck
+    pread64=libc.pread64
+    pread64.argtypes = [c_int, c_void_p, c_size_t, c_off64_t]
+    pread64.restype = c_ssize_t
+    pread64.errcheck=errcheck
+    c_close=libc.close
+    c_close.argtypes = [c_int]
+    c_close.restype = c_int
+    LARGE_FILE_SUPPORT=True
+except:
+    logger.warning("no Large File Support")
 
 class LinProcess(BaseProcess):
     def __init__(self, pid=None, name=None, debug=True, ptrace=None):
@@ -82,13 +115,13 @@ class LinProcess(BaseProcess):
         with open("/proc/sys/kernel/yama/ptrace_scope",'rb') as f:
             ptrace_scope=int(f.read().strip())
         if ptrace_scope==3:
-            logging.warning("yama/ptrace_scope == 3 (no attach). :/")
+            logger.warning("yama/ptrace_scope == 3 (no attach). :/")
         if os.getuid()==0:
             return
         elif ptrace_scope == 1:
-            logging.warning("yama/ptrace_scope == 1 (restricted). you can't ptrace other process ... get root")
+            logger.warning("yama/ptrace_scope == 1 (restricted). you can't ptrace other process ... get root")
         elif ptrace_scope == 2:
-            logging.warning("yama/ptrace_scope == 2 (admin-only). Warning: check you have CAP_SYS_PTRACE")
+            logger.warning("yama/ptrace_scope == 2 (admin-only). Warning: check you have CAP_SYS_PTRACE")
 
     def close(self):
         if self.ptrace_started:
@@ -187,9 +220,26 @@ class LinProcess(BaseProcess):
         if self.read_ptrace:
             self.ptrace_attach()
         data=b''
-        with open("/proc/" + str(self.pid) + "/mem", 'rb', 0) as mem_file:
-            mem_file.seek(address)
-            data=mem_file.read(bytes)
+        if not LARGE_FILE_SUPPORT or int(address)<2**32:
+            with open("/proc/" + str(self.pid) + "/mem", 'rb', 0) as mem_file:
+                mem_file.seek(address)
+                data=mem_file.read(bytes)
+        else:
+            path=create_string_buffer("/proc/" + str(self.pid) + "/mem")
+            fd=open64(byref(path), os.O_RDONLY)
+            try:
+                lseek64(fd, address, os.SEEK_SET)
+                #buf=create_string_buffer(bytes)
+                data=b""
+                try:
+                    data=os.read(fd, bytes)
+                    #while total_read<buffer:
+                    #r=pread64(fd, byref(buf), (bytes), int(address))
+                    #data+=buf.value[0:r]
+                except Exception as e:
+                    logger.info("Error reading %s at %s: %s"%((bytes),address, e))
+            finally:
+                c_close(fd)
         if self.read_ptrace:
             self.ptrace_detach()
         return data
