@@ -29,6 +29,9 @@ class BaseProcess(object):
     def read_bytes(self, address, bytes = 4):
         raise NotImplementedError
 
+    def get_symbolic_name(self, address):
+        return '0x%08X' % int(address)
+
     def read(self, address, type = 'uint', maxlen = 50, errors='raise'):
         if type == 's' or type == 'string':
             s = self.read_bytes(int(address), bytes=maxlen)
