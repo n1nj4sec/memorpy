@@ -21,13 +21,14 @@ import Process
 import utils
 import struct
 from Address import Address
+import traceback
 import binascii
 from structures import *
 
 logger = logging.getLogger('memorpy')
-logger.setLevel(logging.ERROR)
+logger.setLevel(logging.WARNING)
 ch = logging.StreamHandler()
-ch.setLevel(logging.ERROR)
+ch.setLevel(logging.WARNING)
 logger.addHandler(ch)
 
 
@@ -121,7 +122,15 @@ class MemWorker(object):
                         chunk_size=chunk
                     b += self.process.read_bytes(current_offset, chunk_size)
                     totalread += chunk_size
+                except IOError as e:
+                    if e.errno==13:
+                        raise
+                    else:
+                        logger.info(e)
+                    chunk_exc=True
+                    break
                 except Exception as e:
+                    print traceback.format_exc()
                     logger.warning(e)
                     chunk_exc=True
                     break

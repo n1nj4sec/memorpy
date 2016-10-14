@@ -21,10 +21,18 @@ import platform
 import ctypes, re, sys
 import os
 from BaseProcess import BaseProcess, ProcessException
+from structures import *
+import logging
+import time
 
-c_ptrace = ctypes.CDLL("libc.so.6").ptrace
+libc=ctypes.CDLL("libc.so.6")
+c_ptrace = libc.ptrace
 c_pid_t = ctypes.c_int32 # This assumes pid_t is int32_t
 c_ptrace.argtypes = [ctypes.c_int, c_pid_t, ctypes.c_void_p, ctypes.c_void_p]
+c_ptrace.restype = ctypes.c_long
+mprotect = libc.mprotect
+mprotect.restype = ctypes.c_int
+mprotect.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int]
 
 class LinProcess(BaseProcess):
     def __init__(self, pid=None, name=None, debug=True, ptrace=None):
@@ -40,18 +48,58 @@ class LinProcess(BaseProcess):
             raise ValueError("You need to instanciate process with at least a name or a pid")
         if ptrace is None:
             if os.getuid()==0:
-                ptrace=False # no need to ptrace the process when root
+                self.read_ptrace=False # no need to ptrace the process when root to read memory
             else:
-                ptrace=True
-        self._open(ptrace)
+                self.read_ptrace=True
+        self._open()
+
+    def check_ptrace_scope(self):
+        """ check ptrace scope and raise an exception if privileges are unsufficient
+
+        The sysctl settings (writable only with CAP_SYS_PTRACE) are:
+
+        0 - classic ptrace permissions: a process can PTRACE_ATTACH to any other
+            process running under the same uid, as long as it is dumpable (i.e.
+            did not transition uids, start privileged, or have called
+            prctl(PR_SET_DUMPABLE...) already). Similarly, PTRACE_TRACEME is
+            unchanged.
+
+        1 - restricted ptrace: a process must have a predefined relationship
+            with the inferior it wants to call PTRACE_ATTACH on. By default,
+            this relationship is that of only its descendants when the above
+            classic criteria is also met. To change the relationship, an
+            inferior can call prctl(PR_SET_PTRACER, debugger, ...) to declare
+            an allowed debugger PID to call PTRACE_ATTACH on the inferior.
+            Using PTRACE_TRACEME is unchanged.
+
+        2 - admin-only attach: only processes with CAP_SYS_PTRACE may use ptrace
+            with PTRACE_ATTACH, or through children calling PTRACE_TRACEME.
+
+        3 - no attach: no processes may use ptrace with PTRACE_ATTACH nor via
+            PTRACE_TRACEME. Once set, this sysctl value cannot be changed.
+        """
+
+        with open("/proc/sys/kernel/yama/ptrace_scope",'rb') as f:
+            ptrace_scope=int(f.read().strip())
+        if ptrace_scope==3:
+            logging.warning("yama/ptrace_scope == 3 (no attach). :/")
+        if os.getuid()==0:
+            return
+        elif ptrace_scope == 1:
+            logging.warning("yama/ptrace_scope == 1 (restricted). you can't ptrace other process ... get root")
+        elif ptrace_scope == 2:
+            logging.warning("yama/ptrace_scope == 2 (admin-only). Warning: check you have CAP_SYS_PTRACE")
 
     def close(self):
         if self.ptrace_started:
             self.ptrace_detach()
 
-    def _open(self, ptrace):
-        if ptrace:
-            self.ptrace_attach()
+    def _open(self):
+        self.check_ptrace_scope()
+        #to raise an exception if ptrace is not allowed
+        self.ptrace_attach()
+        time.sleep(0.1) # IDK why, but I need to wait before detaching to avoid an error !?
+        self.ptrace_detach()
 
     @staticmethod
     def pid_from_name(name):
@@ -70,13 +118,14 @@ class LinProcess(BaseProcess):
 
     ## Partial interface to ptrace(2), only for PTRACE_ATTACH and PTRACE_DETACH.
     def _ptrace(self, attach):
-        op = ctypes.c_int(16 if attach else 17) #PTRACE_ATTACH or PTRACE_DETACH
+        op = ctypes.c_int(PTRACE_ATTACH if attach else PTRACE_DETACH)
         c_pid = c_pid_t(self.pid)
         null = ctypes.c_void_p()
         err = c_ptrace(op, c_pid, null, null)
         if err != 0:
-            raise OSError("%s : Error using ptrace"%err)
-        self.ptrace_started=True
+            if attach:
+                raise OSError("%s : Error using ptrace PTRACE_ATTACH"%(err))
+            raise OSError("%s : Error using ptrace PTRACE_DETACH"%(err))
 
     def iter_region(self, start_offset=None, end_offset=None, protec=None):
         with open("/proc/" + str(self.pid) + "/maps", 'r') as maps_file:
@@ -94,19 +143,55 @@ class LinProcess(BaseProcess):
                     yield start, chunk
         
     def ptrace_attach(self):
-        return self._ptrace(True)
+        if not self.ptrace_started:
+            res=self._ptrace(True)
+            self.ptrace_started=True
+        return res
 
     def ptrace_detach(self):
-        return self._ptrace(False)
+        if self.ptrace_started:
+            res=self._ptrace(False)
+            self.ptrace_started=False
+        return res
 
     def write_bytes(self, address, data):
-        raise NotImplementedError
+        #with open("/proc/" + str(self.pid) + "/mem", 'rwb', 0) as mem_file:
+            #mem_file.seek(address)
+            #mem_file.write(data)
+
+        if not self.ptrace_started:
+            self.ptrace_attach()
+
+        c_pid = c_pid_t(self.pid)
+        null = ctypes.c_void_p()
+        
+       
+        #we can only copy data per range of 4 or 8 bytes
+        word_size=ctypes.sizeof(ctypes.c_void_p)
+        #mprotect(address, len(data)+(len(data)%word_size), PROT_WRITE|PROT_READ)
+        for i in range(0, len(data), word_size):
+            word=data[i:i+word_size]
+            if len(word)<word_size: #we need to let some data untouched, so let's read at given offset to complete or 8 bytes
+                existing_data=self.read_bytes(int(address)+i+len(word), bytes=(word_size-len(word)))
+                word+=existing_data
+            if sys.byteorder=="little":
+                word=word[::-1]
+            err = c_ptrace(ctypes.c_int(PTRACE_POKEDATA), c_pid, int(address)+i, int(word.encode("hex"), 16))
+            if err != 0:
+                raise OSError("%s : Error using ptrace PTRACE_POKEDATA"%err)
+
+        self.ptrace_detach()
+        return True
 
     def read_bytes(self, address, bytes = 4):
+        if self.read_ptrace:
+            self.ptrace_attach()
         data=b''
-        with open("/proc/" + str(self.pid) + "/mem", 'r', 0) as mem_file:
+        with open("/proc/" + str(self.pid) + "/mem", 'rb', 0) as mem_file:
             mem_file.seek(address)
             data=mem_file.read(bytes)
+        if self.read_ptrace:
+            self.ptrace_detach()
         return data
 
 
