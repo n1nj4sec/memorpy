@@ -95,14 +95,14 @@ class MemWorker(object):
         ftype = ftype.lower().strip()
         if type(value) is list:
             ftype = 'group'
-        if ftype == 're':
+        if ftype == 're' or ftype == 'groups':
             if type(value) is str:
                 regex = re.compile(value)
             else:
                 regex = value
         if ftype == 'float':
             structtype, structlen = utils.type_unpack(ftype)
-        elif ftype != 'match' and ftype != 'group' and ftype != 're':
+        elif ftype != 'match' and ftype != 'group' and ftype != 're' and ftype != 'groups':
             structtype, structlen = utils.type_unpack(ftype)
             value = struct.pack(structtype, value)
         for offset, chunk in self.process.iter_region(start_offset=start_offset, end_offset=end_offset, protec=protec):
@@ -157,6 +157,10 @@ class MemWorker(object):
                                 yield self.Address(soffset, 'float')
                         except Exception as e:
                             pass
+
+                elif ftype == 'groups':
+                    for res in regex.findall(b):
+                        yield res
 
                 else:
                     index = b.find(value)
