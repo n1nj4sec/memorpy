@@ -1,7 +1,11 @@
 # memorpy
 Python library using ctypes to search/edit windows and linux programs memory. Some functions are not implemented as I only implemented what I needed at the time I wrote this ;) But the basic functions should works just fine
 
-#usage examples :
+# install
+```
+pip install https://github.com/n1nj4sec/memorpy/archive/master.zip
+```
+# usage examples :
 In this example open a notepad.exe (x32) and type in some text we will edit from memory !
 ```python
 >>> from memorpy import *
