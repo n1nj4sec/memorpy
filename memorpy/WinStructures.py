@@ -149,9 +149,12 @@ WriteProcessMemory.restype = BOOL
 if sizeof(c_void_p) == 8:
     NtWow64ReadVirtualMemory64=None
 else:
-    NtWow64ReadVirtualMemory64 = windll.ntdll.NtWow64ReadVirtualMemory64
-    NtWow64ReadVirtualMemory64.argtypes = [HANDLE, c_longlong, LPVOID, c_ulonglong, POINTER(c_ulong)] # NTSTATUS (__stdcall *NtWow64ReadVirtualMemory64)(HANDLE ProcessHandle, PVOID64 BaseAddress, PVOID Buffer, ULONGLONG BufferSize, PULONGLONG NumberOfBytesRead);
-    NtWow64ReadVirtualMemory64.restype = BOOL
+    try:
+        NtWow64ReadVirtualMemory64 = windll.ntdll.NtWow64ReadVirtualMemory64
+        NtWow64ReadVirtualMemory64.argtypes = [HANDLE, c_longlong, LPVOID, c_ulonglong, POINTER(c_ulong)] # NTSTATUS (__stdcall *NtWow64ReadVirtualMemory64)(HANDLE ProcessHandle, PVOID64 BaseAddress, PVOID Buffer, ULONGLONG BufferSize, PULONGLONG NumberOfBytesRead);
+        NtWow64ReadVirtualMemory64.restype = BOOL
+    except:
+        NtWow64ReadVirtualMemory64=None
 
 VirtualQueryEx = windll.kernel32.VirtualQueryEx
 VirtualQueryEx.argtypes = [HANDLE, LPCVOID, POINTER(MEMORY_BASIC_INFORMATION), c_size_t]
