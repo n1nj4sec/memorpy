@@ -17,6 +17,7 @@
 import copy
 import time
 from Address import Address
+import struct
 
 class Locator(object):
     """ 
@@ -51,11 +52,10 @@ class Locator(object):
             all_types = [self.type]
         for type in all_types:
             if type not in new_iter:
-                if self.start is None:
-                    self.start = self.mw.start_offset
-                if self.end is None:
-                    self.end = self.mw.end_offset
-                new_iter[type] = [ Address(x, self.mw.process, type) for x in self.mw.mem_search(value, type, start_offset=self.start, end_offset=self.end) ]
+                try:
+                    new_iter[type] = [ Address(x, self.mw.process, type) for x in self.mw.mem_search(value, type, start_offset=self.start, end_offset=self.end) ]
+                except struct.error:
+                    new_iter[type] = []
             else:
                 l = []
                 for address in new_iter[type]:
