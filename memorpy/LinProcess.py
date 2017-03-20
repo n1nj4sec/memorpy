@@ -128,6 +128,7 @@ class LinProcess(BaseProcess):
             self.ptrace_detach()
 
     def _open(self):
+        self.isProcessOpen = True
         self.check_ptrace_scope()
         #to raise an exception if ptrace is not allowed
         self.ptrace_attach()

@@ -88,39 +88,101 @@ class MemWorker(object):
 
         return self.mem_search(re.escape(regex), ftype='re')
 
+    def parse_re_function(self, b, value):
+        for reg in value:
+            name = reg[0]
+            regex = reg[1]
+
+            duplicates_cache = set()
+            for res in regex.findall(b):
+                index = b.find(res)
+                while index != -1:
+                    soffset = offset + index
+                    if soffset not in duplicates_cache:
+                        duplicates_cache.add(soffset)
+                        yield name, self.Address(soffset, 'bytes')
+                    index = b.find(res, index + len(res))
+
+    def parse_float_function(self, b, value):
+        for index in range(0, len(b)):
+            try:
+                structtype, structlen = utils.type_unpack('float')
+                tmpval = struct.unpack(structtype, b[index:index + 4])[0]
+                if int(value) == int(tmpval):
+                    soffset = offset + index
+                    yield self.Address(soffset, 'float')
+            except Exception as e:
+                pass
+
+    def parse_groups_function(self, b, value):
+        for reg in value:
+            name = reg[0]
+            regex = reg[1]
+            for res in regex.findall(b):
+                yield name, res
+
+    def parse_any_function(self, b, value):
+        index = b.find(value)
+        while index != -1:
+            soffset = offset + index
+            yield self.Address(soffset, 'bytes')
+            index = b.find(value, index + 1)
+
     def mem_search(self, value, ftype = 'match', protec = PAGE_READWRITE | PAGE_READONLY, start_offset = None, end_offset = None):
         """ 
                 iterator returning all indexes where the pattern has been found
         """
-        ftype = ftype.lower().strip()
-        if type(value) is list:
-            ftype = 'group'
+        
+        # pre-compile regex to run faster
         if ftype == 're' or ftype == 'groups':
-            if type(value) is str:
-                regex = re.compile(value)
-            else:
-                regex = value
-        if ftype == 'float':
-            structtype, structlen = utils.type_unpack(ftype)
+            
+            # value should be an array of regex
+            if type(value) is not list:
+                value = [value]
+            
+            tmp = []
+            for reg in value:
+                if type(reg) is tuple:
+                    name = reg[0]
+                    regex = re.compile(reg[1])
+                else:
+                    name = ''
+                    regex = re.compile(reg)
+
+                tmp.append((name, regex))
+            value = tmp
+
         elif ftype != 'match' and ftype != 'group' and ftype != 're' and ftype != 'groups':
             structtype, structlen = utils.type_unpack(ftype)
             value = struct.pack(structtype, value)
-        for offset, chunk in self.process.iter_region(start_offset=start_offset, end_offset=end_offset, protec=protec):
+
+        # different functions avoid if statement before parsing the buffer
+        if ftype == 're':
+            func = self.parse_re_function        
+        
+        elif ftype == 'groups':
+            func = self.parse_groups_function
+
+        elif ftype == 'float':
+            func = self.parse_float_function
+
+        else:
+            func = self.parse_any_function
+
+        if not self.process.isProcessOpen:
+            raise ProcessException("Can't read_bytes, process %s is not open" % (self.process.pid))
+
+        for offset, chunk_size in self.process.iter_region(start_offset=start_offset, end_offset=end_offset, protec=protec):
             b = ''
-            totalread=0
-            current_offset=offset
-            chunk_size=10000000
-            chunk_read=0
-            chunk_exc=False
-            while chunk_read < chunk:
+            current_offset = offset
+            chunk_read = 0
+            chunk_exc = False
+            while chunk_read < chunk_size:
                 try:
-                    if chunk_size>chunk:
-                        chunk_size=chunk
                     b += self.process.read_bytes(current_offset, chunk_size)
-                    totalread += chunk_size
                 except IOError as e:
                     print traceback.format_exc()
-                    if e.errno==13:
+                    if e.errno == 13:
                         raise
                     else:
                         logger.warning(e)
@@ -128,45 +190,14 @@ class MemWorker(object):
                     break
                 except Exception as e:
                     logger.warning(e)
-                    chunk_exc=True
+                    chunk_exc = True
                     break
                 finally:
-                    current_offset +=chunk_size
+                    current_offset += chunk_size
                     chunk_read += chunk_size
             if chunk_exc:
                 continue
 
             if b:
-                if ftype == 're':
-                    duplicates_cache = set()
-                    for res in regex.findall(b):
-                        index = b.find(res)
-                        while index != -1:
-                            soffset = offset + index
-                            if soffset not in duplicates_cache:
-                                duplicates_cache.add(soffset)
-                                yield self.Address(soffset, 'bytes')
-                            index = b.find(res, index + len(res))
-
-                elif ftype == 'float':
-                    for index in range(0, len(b)):
-                        try:
-                            tmpval = struct.unpack(structtype, b[index:index + 4])[0]
-                            if int(value) == int(tmpval):
-                                soffset = offset + index
-                                yield self.Address(soffset, 'float')
-                        except Exception as e:
-                            pass
-
-                elif ftype == 'groups':
-                    for res in regex.findall(b):
-                        yield res
-
-                else:
-                    index = b.find(value)
-                    while index != -1:
-                        soffset = offset + index
-                        yield self.Address(soffset, 'bytes')
-                        index = b.find(value, index + 1)
-
-
+                for name, res in func(b, value):
+                    yield name, res
