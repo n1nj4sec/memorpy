@@ -39,25 +39,21 @@ class WinProcess(BaseProcess):
     def __init__(self, pid=None, name=None, debug=True):
         """ Create and Open a process object from its pid or from its name """
         super(WinProcess, self).__init__()
-        if pid is not None:
-            if debug:
-                self._open(int(pid), debug=True)
-            else:
-                self._open(int(pid), debug=False)
-        elif name is not None:
-            if debug:
-                self._open_from_name(name, debug=True)
-            else:
-                self._open_from_name(name, debug=False)
+        if pid:
+            self._open(int(pid), debug=debug)
+            
+        elif name:
+            self._open_from_name(name, debug=debug)
         else:
             raise ValueError("You need to instanciate process with at least a name or a pid")
+        
         if self.is_64bit():
-            si=self.GetNativeSystemInfo()
-            self.max_addr=si.lpMaximumApplicationAddress
+            si = self.GetNativeSystemInfo()
+            self.max_addr = si.lpMaximumApplicationAddress
         else:
-            si=self.GetSystemInfo()
-            self.max_addr=2147418111
-        self.min_addr=si.lpMinimumApplicationAddress
+            si = self.GetSystemInfo()
+            self.max_addr = 2147418111
+        self.min_addr = si.lpMinimumApplicationAddress
 
 
     def __del__(self):
@@ -122,20 +118,20 @@ class WinProcess(BaseProcess):
 
     def _open(self, dwProcessId, debug=False):
         if debug:
-            process = OpenProcess(262144, 0, dwProcessId)
+            process = kernel32.OpenProcess(262144, 0, dwProcessId)
             info = win32security.GetSecurityInfo(kernel32.GetCurrentProcess(), 6, 0)
             win32security.SetSecurityInfo(process, 6, win32security.DACL_SECURITY_INFORMATION | win32security.UNPROTECTED_DACL_SECURITY_INFORMATION, None, None, info.GetSecurityDescriptorDacl(), info.GetSecurityDescriptorGroup())
-            CloseHandle(process)
-        self.h_process = OpenProcess(2035711, 0, dwProcessId)
+            kernel32.CloseHandle(process)
+        self.h_process = kernel32.OpenProcess(2035711, 0, dwProcessId)
         if self.h_process is not None:
             self.isProcessOpen = True
-            self.pid=dwProcessId
+            self.pid = dwProcessId
             return True
         return False
 
     def close(self):
         if self.h_process is not None:
-            ret = CloseHandle(self.h_process) == 1
+            ret = kernel32.CloseHandle(self.h_process) == 1
             if ret:
                 self.h_process = None
                 self.pid = None
@@ -183,17 +179,13 @@ class WinProcess(BaseProcess):
         return old_protect.value
 
     def iter_region(self, start_offset=None, end_offset=None, protec=None):
-        if start_offset is None:
-            offset = self.min_addr
-            start_offset=self.min_addr
-        else:
-            offset = start_offset
-        if end_offset is None:
-            end_offset = self.max_addr
+        
+        offset = start_offset or self.min_addr
+        end_offset = end_offset or self.max_addr
+
         while True:
             if offset >= end_offset:
                 break
-            totalread = 0
             mbi = self.VirtualQueryEx(offset)
             offset = mbi.BaseAddress
             chunk = mbi.RegionSize
@@ -208,7 +200,7 @@ class WinProcess(BaseProcess):
                     offset += chunk
                     continue
             yield offset, chunk
-            offset+=chunk
+            offset += chunk
 
     def write_bytes(self, address, data):
         address = int(address)
@@ -237,22 +229,17 @@ class WinProcess(BaseProcess):
         if use_NtWow64ReadVirtualMemory64:
             if NtWow64ReadVirtualMemory64 is None:
                 raise WindowsError("NtWow64ReadVirtualMemory64 is not available from a 64bit process")
-            RpM=NtWow64ReadVirtualMemory64
+            RpM = NtWow64ReadVirtualMemory64
         else:
-            RpM=ReadProcessMemory
+            RpM = ReadProcessMemory
 
         address = int(address)
-        if not self.isProcessOpen:
-            raise ProcessException("Can't read_bytes(%s, bytes=%s), process %s is not open" % (address, bytes, self.pid))
-        #print "creating buf: %s"%bytes
         buffer = create_string_buffer(bytes)
         bytesread = c_size_t(0)
         data = ''
         length = bytes
-        _address = address
-        _length = length
         while length:
-            if RpM(self.h_process, address, buffer, bytes, byref(bytesread)) or (use_NtWow64ReadVirtualMemory64 and GetLastError()==0):
+            if RpM(self.h_process, address, buffer, bytes, byref(bytesread)) or (use_NtWow64ReadVirtualMemory64 and GetLastError() == 0):
                 if bytesread.value:
                     data += buffer.raw[:bytesread.value]
                     length -= bytesread.value
@@ -264,13 +251,13 @@ class WinProcess(BaseProcess):
                      bytesread.value))
                 return data
             else:
-                if GetLastError()==299:#only part of ReadProcessMemory has been done, let's return it
-                    data+=buffer.raw[:bytesread.value]
+                if GetLastError()==299: #only part of ReadProcessMemory has been done, let's return it
+                    data += buffer.raw[:bytesread.value]
                     return data
                 raise WinError()
-            data += buffer.raw[:bytesread.value]
-            length -= bytesread.value
-            address += bytesread.value
+            # data += buffer.raw[:bytesread.value]
+            # length -= bytesread.value
+            # address += bytesread.value
         return data
 
    
@@ -287,7 +274,7 @@ class WinProcess(BaseProcess):
                         module_list.append(copy.copy(module_entry))
                     success = Module32Next(hModuleSnap, byref(module_entry))
 
-                CloseHandle(hModuleSnap)
+                kernel32.CloseHandle(hModuleSnap)
         return module_list
 
     def get_symbolic_name(self, address):
