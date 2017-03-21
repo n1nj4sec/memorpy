@@ -89,10 +89,7 @@ class MemWorker(object):
         return self.mem_search(re.escape(regex), ftype='re')
 
     def parse_re_function(self, b, value):
-        for reg in value:
-            name = reg[0]
-            regex = reg[1]
-
+        for name, regex in value:
             duplicates_cache = set()
             for res in regex.findall(b):
                 index = b.find(res)
@@ -115,9 +112,7 @@ class MemWorker(object):
                 pass
 
     def parse_groups_function(self, b, value):
-        for reg in value:
-            name = reg[0]
-            regex = reg[1]
+        for name, regex in value:
             for res in regex.findall(b):
                 yield name, res
 
@@ -144,10 +139,10 @@ class MemWorker(object):
             for reg in value:
                 if type(reg) is tuple:
                     name = reg[0]
-                    regex = re.compile(reg[1])
+                    regex = re.compile(reg[1], re.IGNORECASE)
                 else:
                     name = ''
-                    regex = re.compile(reg)
+                    regex = re.compile(reg, re.IGNORECASE)
 
                 tmp.append((name, regex))
             value = tmp
