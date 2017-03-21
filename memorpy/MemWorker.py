@@ -88,7 +88,7 @@ class MemWorker(object):
 
         return self.mem_search(re.escape(regex), ftype='re')
 
-    def parse_re_function(self, b, value):
+    def parse_re_function(self, b, value, offset):
         for name, regex in value:
             duplicates_cache = set()
             for res in regex.findall(b):
@@ -100,7 +100,7 @@ class MemWorker(object):
                         yield name, self.Address(soffset, 'bytes')
                     index = b.find(res, index + len(res))
 
-    def parse_float_function(self, b, value):
+    def parse_float_function(self, b, value, offset):
         for index in range(0, len(b)):
             try:
                 structtype, structlen = utils.type_unpack('float')
@@ -111,12 +111,12 @@ class MemWorker(object):
             except Exception as e:
                 pass
 
-    def parse_groups_function(self, b, value):
+    def parse_groups_function(self, b, value, offset=None):
         for name, regex in value:
             for res in regex.findall(b):
                 yield name, res
 
-    def parse_any_function(self, b, value):
+    def parse_any_function(self, b, value, offset):
         index = b.find(value)
         while index != -1:
             soffset = offset + index
@@ -194,5 +194,5 @@ class MemWorker(object):
                 continue
 
             if b:
-                for name, res in func(b, value):
+                for name, res in func(b, value, offset):
                     yield name, res
