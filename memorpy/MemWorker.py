@@ -194,5 +194,5 @@ class MemWorker(object):
                 continue
 
             if b:
-                for name, res in func(b, value, offset):
-                    yield name, res
+                for res in func(b, value, offset):
+                    yield res
