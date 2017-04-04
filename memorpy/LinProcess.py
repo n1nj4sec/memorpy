@@ -136,6 +136,17 @@ class LinProcess(BaseProcess):
         self.ptrace_detach()
 
     @staticmethod
+    def list():
+        processes=[]
+        for pid in os.listdir("/proc"):
+            try:
+                exe=os.readlink("/proc/%s/exe"%pid)
+                processes.append({"pid":int(pid), "name":exe})
+            except:
+                pass
+        return processes
+
+    @staticmethod
     def pid_from_name(name):
         #quick and dirty, works with all linux not depending on ps output
         for pid in os.listdir("/proc"):
@@ -189,10 +200,6 @@ class LinProcess(BaseProcess):
         return res
 
     def write_bytes(self, address, data):
-        #with open("/proc/" + str(self.pid) + "/mem", 'rwb', 0) as mem_file:
-            #mem_file.seek(address)
-            #mem_file.write(data)
-
         if not self.ptrace_started:
             self.ptrace_attach()
 
@@ -230,13 +237,9 @@ class LinProcess(BaseProcess):
             fd=open64(byref(path), os.O_RDONLY)
             try:
                 lseek64(fd, address, os.SEEK_SET)
-                #buf=create_string_buffer(bytes)
                 data=b""
                 try:
                     data=os.read(fd, bytes)
-                    #while total_read<buffer:
-                    #r=pread64(fd, byref(buf), (bytes), int(address))
-                    #data+=buf.value[0:r]
                 except Exception as e:
                     logger.info("Error reading %s at %s: %s"%((bytes),address, e))
             finally:
