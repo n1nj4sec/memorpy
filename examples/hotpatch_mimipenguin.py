@@ -3,6 +3,8 @@
 # Author: Nicolas VERDIER (contact@n1nj4.eu)
 
 """
+    WARNING: this script is here to serve as an example and is deprectated for the following : https://github.com/n1nj4sec/mimipy
+
     Poc to show how to mitigate the awesome mimipenguin script (https://github.com/huntergregal/mimipenguin)
     This script run mimipenguin.sh, search for the cleartext passwords offsets in memory and override the passwords with xxxx
     Only tested with gnome-keyring and Ubuntu 16.04, no crash so far :=)
@@ -10,6 +12,9 @@
 import sys, os
 import subprocess
 import urllib2
+
+print "WARNING: this script is here to serve as an example and is deprectated for the following : https://github.com/n1nj4sec/mimipy"
+
 try:
     from memorpy import *
 except ImportError as e:
@@ -26,6 +31,7 @@ if not os.path.isfile("mimipenguin.sh"):
     res=urllib2.urlopen(mimipenguin_url).read()
     with open("mimipenguin.sh",'wb') as w:
         w.write(res)
+
 print "[+] running mimipenguin.sh to retrieve current passwords ..."
 res=subprocess.check_output(["bash","mimipenguin.sh"])
 
