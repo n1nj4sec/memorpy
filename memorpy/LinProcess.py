@@ -111,17 +111,19 @@ class LinProcess(BaseProcess):
         3 - no attach: no processes may use ptrace with PTRACE_ATTACH nor via
             PTRACE_TRACEME. Once set, this sysctl value cannot be changed.
         """
-
-        with open("/proc/sys/kernel/yama/ptrace_scope",'rb') as f:
-            ptrace_scope=int(f.read().strip())
-        if ptrace_scope==3:
-            logger.warning("yama/ptrace_scope == 3 (no attach). :/")
-        if os.getuid()==0:
-            return
-        elif ptrace_scope == 1:
-            logger.warning("yama/ptrace_scope == 1 (restricted). you can't ptrace other process ... get root")
-        elif ptrace_scope == 2:
-            logger.warning("yama/ptrace_scope == 2 (admin-only). Warning: check you have CAP_SYS_PTRACE")
+        try:
+            with open("/proc/sys/kernel/yama/ptrace_scope",'rb') as f:
+                ptrace_scope=int(f.read().strip())
+            if ptrace_scope==3:
+                logger.warning("yama/ptrace_scope == 3 (no attach). :/")
+            if os.getuid()==0:
+                return
+            elif ptrace_scope == 1:
+                logger.warning("yama/ptrace_scope == 1 (restricted). you can't ptrace other process ... get root")
+            elif ptrace_scope == 2:
+                logger.warning("yama/ptrace_scope == 2 (admin-only). Warning: check you have CAP_SYS_PTRACE")
+        except Exception as e:
+            logger.warning("Error getting ptrace_scope ?? : %s"%e)
 
     def close(self):
         if self.ptrace_started:
