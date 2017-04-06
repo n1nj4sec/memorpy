@@ -145,7 +145,10 @@ class MemWorker(object):
             for reg in value:
                 if type(reg) is tuple:
                     name = reg[0]
-                    regex = re.compile(reg[1], re.IGNORECASE)
+                    if type(reg[1]) != REGEX_TYPE:
+                        regex = re.compile(reg[1], re.IGNORECASE)
+                    else:
+                        regex=reg[1]
                 elif type(reg) == REGEX_TYPE:
                     name = ''
                     regex=reg
