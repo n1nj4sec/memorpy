@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: UTF8 -*-
 
+import utils
+import struct
+
 """ Base class for process not linked to any platform """
 
 class ProcessException(Exception):

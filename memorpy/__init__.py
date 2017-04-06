@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with memorpy.  If not, see <http://www.gnu.org/licenses/>.
 
+
 import logging
 logger=logging.getLogger("memorpy")
 logger.setLevel(logging.WARNING)
@@ -27,5 +28,6 @@ from Locator import *
 from Address import *
 from Process import *
 from utils import *
+from version import version
 #if sys.platform=="win32":
 #    from wintools import *  #not a necessary dependency, just used for debugging

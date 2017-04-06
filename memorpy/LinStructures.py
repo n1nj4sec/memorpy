@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: UTF8 -*-
 
-PROT_NONE = 0x0
-PROT_READ = 0x1
-PROT_WRITE = 0x2
-PROT_EXEC = 0x4
+PROT_NONE = 0
+PROT_READ = 1
+PROT_WRITE = 2
+PROT_EXEC = 4
+PROT_PRIVATE = 8
+PROT_SHARED = 16
 
 #Use some Windows constants for compatibility
 PAGE_EXECUTE_READWRITE = PROT_EXEC | PROT_READ | PROT_WRITE

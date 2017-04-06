@@ -27,8 +27,7 @@ from structures import *
 
 logger = logging.getLogger('memorpy')
 
-
-    
+REGEX_TYPE=type(re.compile("^plop$"))
 class MemWorker(object):
 
     def __init__(self, pid=None, name=None, end_offset = None, start_offset = None, debug=True):
@@ -90,8 +89,9 @@ class MemWorker(object):
 
     def parse_re_function(self, b, value, offset):
         for name, regex in value:
-            duplicates_cache = set()
-            for res in regex.findall(b):
+            for res in regex.finditer(b):
+                yield name, self.Address(offset+res.start(), 'bytes')
+                """
                 index = b.find(res)
                 while index != -1:
                     soffset = offset + index
@@ -99,6 +99,7 @@ class MemWorker(object):
                         duplicates_cache.add(soffset)
                         yield name, self.Address(soffset, 'bytes')
                     index = b.find(res, index + len(res))
+                """
 
     def parse_float_function(self, b, value, offset):
         for index in range(0, len(b)):
@@ -111,10 +112,15 @@ class MemWorker(object):
             except Exception as e:
                 pass
 
+    def parse_named_groups_function(self, b, value, offset=None):
+        for name, regex in value:
+            for res in regex.finditer(b):
+                yield name, res.groupdict()
+
     def parse_groups_function(self, b, value, offset=None):
         for name, regex in value:
-            for res in regex.findall(b):
-                yield name, res
+            for res in regex.finditer(b):
+                yield name, res.groups()
 
     def parse_any_function(self, b, value, offset):
         index = b.find(value)
@@ -123,13 +129,13 @@ class MemWorker(object):
             yield self.Address(soffset, 'bytes')
             index = b.find(value, index + 1)
 
-    def mem_search(self, value, ftype = 'match', protec = PAGE_READWRITE | PAGE_READONLY, start_offset = None, end_offset = None):
+    def mem_search(self, value, ftype = 'match', protec = PAGE_READWRITE | PAGE_READONLY, optimizations=None, start_offset = None, end_offset = None):
         """ 
                 iterator returning all indexes where the pattern has been found
         """
         
         # pre-compile regex to run faster
-        if ftype == 're' or ftype == 'groups':
+        if ftype == 're' or ftype == 'groups' or ftype == 'ngroups':
             
             # value should be an array of regex
             if type(value) is not list:
@@ -140,14 +146,18 @@ class MemWorker(object):
                 if type(reg) is tuple:
                     name = reg[0]
                     regex = re.compile(reg[1], re.IGNORECASE)
+                elif type(reg) == REGEX_TYPE:
+                    name = ''
+                    regex=reg
                 else:
                     name = ''
                     regex = re.compile(reg, re.IGNORECASE)
 
+
                 tmp.append((name, regex))
             value = tmp
 
-        elif ftype != 'match' and ftype != 'group' and ftype != 're' and ftype != 'groups':
+        elif ftype != 'match' and ftype != 'group' and ftype != 're' and ftype != 'groups' and ftype!='ngroups':
             structtype, structlen = utils.type_unpack(ftype)
             value = struct.pack(structtype, value)
 
@@ -158,6 +168,9 @@ class MemWorker(object):
         elif ftype == 'groups':
             func = self.parse_groups_function
 
+        elif ftype == 'ngroups':
+            func = self.parse_named_groups_function
+
         elif ftype == 'float':
             func = self.parse_float_function
 
@@ -167,7 +180,7 @@ class MemWorker(object):
         if not self.process.isProcessOpen:
             raise ProcessException("Can't read_bytes, process %s is not open" % (self.process.pid))
 
-        for offset, chunk_size in self.process.iter_region(start_offset=start_offset, end_offset=end_offset, protec=protec):
+        for offset, chunk_size in self.process.iter_region(start_offset=start_offset, end_offset=end_offset, protec=protec, optimizations=optimizations):
             b = ''
             current_offset = offset
             chunk_read = 0
@@ -196,3 +209,5 @@ class MemWorker(object):
             if b:
                 for res in func(b, value, offset):
                     yield res
+
+
