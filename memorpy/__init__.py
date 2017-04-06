@@ -28,6 +28,5 @@ from Locator import *
 from Address import *
 from Process import *
 from utils import *
-from version import version
 #if sys.platform=="win32":
 #    from wintools import *  #not a necessary dependency, just used for debugging
