@@ -14,8 +14,9 @@ if sys.version_info[0] == 3:
 
 here = os.path.dirname(__file__)
 
+exec(open(os.path.join(here, 'memorpy', 'version.py')).read())
 setup(name = "memorpy",
-    version = '1.2',
+    version = version_string, #@UndefinedVariable,
     description = "Python library using ctypes to search/edit windows/linux programs memory",
     author = "Nicolas VERDIER",
     author_email = "contact@n1nj4.eu",

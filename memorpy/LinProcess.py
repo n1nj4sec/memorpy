@@ -174,11 +174,18 @@ class LinProcess(BaseProcess):
                 raise OSError("%s : Error using ptrace PTRACE_ATTACH"%(err))
             raise OSError("%s : Error using ptrace PTRACE_DETACH"%(err))
 
-    def iter_region(self, start_offset=None, end_offset=None, protec=None):
+    def iter_region(self, start_offset=None, end_offset=None, protec=None, optimizations=None):
+        """
+            optimizations :
+                i for inode==0 (no file mapping)
+                s to avoid scanning shared regions
+                x to avoid scanning x regions
+                r don't scan ronly regions
+        """
         with open("/proc/" + str(self.pid) + "/maps", 'r') as maps_file:
             for line in maps_file:
-                m = re.match(r'([0-9A-Fa-f]+)-([0-9A-Fa-f]+) ([-rwpsx]+)', line)
-                start, end, region_protec = int(m.group(1), 16), int(m.group(2), 16), m.group(3)
+                m = re.match(r'([0-9A-Fa-f]+)-([0-9A-Fa-f]+)\s+([-rwpsx]+)\s+([0-9A-Fa-f]+)\s+([0-9A-Fa-f]+:[0-9A-Fa-f]+)\s+([0-9]+)\s*(.*)', line)
+                start, end, region_protec, offset, dev, inode, pathname = int(m.group(1), 16), int(m.group(2), 16), m.group(3), m.group(4), m.group(5), int(m.group(6)), m.group(7)
                 if start_offset is not None:
                     if start < start_offset:
                         continue
@@ -187,6 +194,15 @@ class LinProcess(BaseProcess):
                         continue
                 chunk=end-start
                 if 'r' in region_protec: # TODO: handle protec parameter
+                    if optimizations:
+                        if 'i' in optimizations and inode != 0:
+                            continue
+                        if 's' in optimizations and 's' in region_protec:
+                            continue
+                        if 'x' in optimizations and 'x' in region_protec:
+                            continue
+                        if 'r' in optimizations and not 'w' in region_protec:
+                            continue
                     yield start, chunk
         
     def ptrace_attach(self):

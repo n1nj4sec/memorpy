@@ -178,7 +178,7 @@ class WinProcess(BaseProcess):
             raise ProcessException('Error: VirtualProtectEx(%08X, %d, %08X)' % (base_address, size, protection))
         return old_protect.value
 
-    def iter_region(self, start_offset=None, end_offset=None, protec=None):
+    def iter_region(self, start_offset=None, end_offset=None, protec=None, optimizations=None):
         
         offset = start_offset or self.min_addr
         end_offset = end_offset or self.max_addr
