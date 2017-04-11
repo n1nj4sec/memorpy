@@ -22,14 +22,14 @@ import ctypes, re, sys
 from ctypes import create_string_buffer, byref, c_int, c_void_p, c_long, c_size_t, c_ssize_t, POINTER, get_errno
 import errno
 import os
-import time
+import signal
 from BaseProcess import BaseProcess, ProcessException
 from structures import *
 import logging
 
 logger = logging.getLogger('memorpy')
 
-libc=ctypes.CDLL("libc.so.6")
+libc=ctypes.CDLL("libc.so.6", use_errno=True)
 get_errno_loc = libc.__errno_location
 get_errno_loc.restype = POINTER(c_int)
 
@@ -122,6 +122,10 @@ class LinProcess(BaseProcess):
                 logger.warning("yama/ptrace_scope == 1 (restricted). you can't ptrace other process ... get root")
             elif ptrace_scope == 2:
                 logger.warning("yama/ptrace_scope == 2 (admin-only). Warning: check you have CAP_SYS_PTRACE")
+
+        except IOError:
+            pass
+
         except Exception as e:
             logger.warning("Error getting ptrace_scope ?? : %s"%e)
 
@@ -134,7 +138,6 @@ class LinProcess(BaseProcess):
         self.check_ptrace_scope()
         #to raise an exception if ptrace is not allowed
         self.ptrace_attach()
-        time.sleep(0.1) # IDK why, but I need to wait before detaching to avoid an error !?
         self.ptrace_detach()
 
     @staticmethod
@@ -168,11 +171,21 @@ class LinProcess(BaseProcess):
         op = ctypes.c_int(PTRACE_ATTACH if attach else PTRACE_DETACH)
         c_pid = c_pid_t(self.pid)
         null = ctypes.c_void_p()
+
+        if not attach:
+            os.kill(self.pid, signal.SIGSTOP)
+            os.waitpid(self.pid, 0)
+
         err = c_ptrace(op, c_pid, null, null)
+
+        if not attach:
+            os.kill(self.pid, signal.SIGCONT)
+
         if err != 0:
-            if attach:
-                raise OSError("%s : Error using ptrace PTRACE_ATTACH"%(err))
-            raise OSError("%s : Error using ptrace PTRACE_DETACH"%(err))
+            raise OSError("%s: %s"%(
+                'PTRACE_ATTACH' if attach else 'PTRACE_DETACH',
+                errno.errorcode.get(ctypes.get_errno(), 'UNKNOWN')
+            ))
 
     def iter_region(self, start_offset=None, end_offset=None, protec=None, optimizations=None):
         """
@@ -204,7 +217,7 @@ class LinProcess(BaseProcess):
                         if 'r' in optimizations and not 'w' in region_protec:
                             continue
                     yield start, chunk
-        
+
     def ptrace_attach(self):
         if not self.ptrace_started:
             res=self._ptrace(True)
@@ -223,8 +236,8 @@ class LinProcess(BaseProcess):
 
         c_pid = c_pid_t(self.pid)
         null = ctypes.c_void_p()
-        
-       
+
+
         #we can only copy data per range of 4 or 8 bytes
         word_size=ctypes.sizeof(ctypes.c_void_p)
         #mprotect(address, len(data)+(len(data)%word_size), PROT_WRITE|PROT_READ)
@@ -265,5 +278,3 @@ class LinProcess(BaseProcess):
         if self.read_ptrace:
             self.ptrace_detach()
         return data
-
-
