@@ -133,6 +133,10 @@ class LinProcess(BaseProcess):
         if self.ptrace_started:
             self.ptrace_detach()
 
+    def __del__(self):
+        if self.ptrace_started:
+            self.ptrace_detach()
+
     def _open(self):
         self.isProcessOpen = True
         self.check_ptrace_scope()
