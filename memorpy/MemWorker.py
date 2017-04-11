@@ -33,6 +33,12 @@ class MemWorker(object):
     def __init__(self, pid=None, name=None, end_offset = None, start_offset = None, debug=True):
         self.process = Process.Process(name=name, pid=pid, debug=debug)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.process.close()
+
     def Address(self, value, default_type = 'uint'):
         """ wrapper to instanciate an Address class for the memworker.process"""
         return Address(value, process=self.process, default_type=default_type)
