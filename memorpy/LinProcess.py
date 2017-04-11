@@ -136,9 +136,10 @@ class LinProcess(BaseProcess):
     def _open(self):
         self.isProcessOpen = True
         self.check_ptrace_scope()
-        #to raise an exception if ptrace is not allowed
-        self.ptrace_attach()
-        self.ptrace_detach()
+        if os.getuid()!=0:
+            #to raise an exception if ptrace is not allowed
+            self.ptrace_attach()
+            self.ptrace_detach()
 
     @staticmethod
     def list():
@@ -243,14 +244,17 @@ class LinProcess(BaseProcess):
         #mprotect(address, len(data)+(len(data)%word_size), PROT_WRITE|PROT_READ)
         for i in range(0, len(data), word_size):
             word=data[i:i+word_size]
-            if len(word)<word_size: #we need to let some data untouched, so let's read at given offset to complete or 8 bytes
+            if len(word)<word_size: #we need to let some data untouched, so let's read at given offset to complete our 8 bytes
                 existing_data=self.read_bytes(int(address)+i+len(word), bytes=(word_size-len(word)))
                 word+=existing_data
             if sys.byteorder=="little":
                 word=word[::-1]
+
+            attempt=0
             err = c_ptrace(ctypes.c_int(PTRACE_POKEDATA), c_pid, int(address)+i, int(word.encode("hex"), 16))
             if err != 0:
-                raise OSError("%s : Error using ptrace PTRACE_POKEDATA"%err)
+                error=errno.errorcode.get(ctypes.get_errno(), 'UNKNOWN')
+                raise OSError("Error using PTRACE_POKEDATA: %s"%error)
 
         self.ptrace_detach()
         return True
