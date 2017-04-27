@@ -20,19 +20,17 @@ import copy
 import struct
 import utils
 import platform
-import win32security
-import win32api
 from BaseProcess import BaseProcess, ProcessException
 
-psapi = windll.psapi
-kernel32 = windll.kernel32
+psapi       = windll.psapi
+kernel32    = windll.kernel32
+advapi32    = windll.advapi32
 
 IsWow64Process=None
 if hasattr(kernel32,'IsWow64Process'):
     IsWow64Process=kernel32.IsWow64Process
     IsWow64Process.restype = c_bool
     IsWow64Process.argtypes = [c_void_p, POINTER(c_bool)]
-
 
 class WinProcess(BaseProcess):
 
@@ -118,9 +116,15 @@ class WinProcess(BaseProcess):
 
     def _open(self, dwProcessId, debug=False):
         if debug:
+            ppsidOwner              = DWORD()
+            ppsidGroup              = DWORD()
+            ppDacl                  = DWORD()
+            ppSacl                  = DWORD()
+            ppSecurityDescriptor    = SECURITY_DESCRIPTOR()
+
             process = kernel32.OpenProcess(262144, 0, dwProcessId)
-            info = win32security.GetSecurityInfo(kernel32.GetCurrentProcess(), 6, 0)
-            win32security.SetSecurityInfo(process, 6, win32security.DACL_SECURITY_INFORMATION | win32security.UNPROTECTED_DACL_SECURITY_INFORMATION, None, None, info.GetSecurityDescriptorDacl(), info.GetSecurityDescriptorGroup())
+            advapi32.GetSecurityInfo(kernel32.GetCurrentProcess(), 6, 0, byref(ppsidOwner), byref(ppsidGroup), byref(ppDacl), byref(ppSacl), byref(ppSecurityDescriptor))
+            advapi32.SetSecurityInfo(process, 6, DACL_SECURITY_INFORMATION | UNPROTECTED_DACL_SECURITY_INFORMATION, None, None, ppSecurityDescriptor.dacl, ppSecurityDescriptor.group)
             kernel32.CloseHandle(process)
         self.h_process = kernel32.OpenProcess(2035711, 0, dwProcessId)
         if self.h_process is not None:
