@@ -130,12 +130,16 @@ class LinProcess(BaseProcess):
             logger.warning("Error getting ptrace_scope ?? : %s"%e)
 
     def close(self):
+        if self.mem_file:
+            if not LARGE_FILE_SUPPORT:
+                self.mem_file.close()
+            else:
+                c_close(self.mem_file)
         if self.ptrace_started:
             self.ptrace_detach()
 
     def __del__(self):
-        if self.ptrace_started:
-            self.ptrace_detach()
+        self.close()
 
     def _open(self):
         self.isProcessOpen = True
@@ -144,6 +148,13 @@ class LinProcess(BaseProcess):
             #to raise an exception if ptrace is not allowed
             self.ptrace_attach()
             self.ptrace_detach()
+
+        #open file descriptor
+        if not LARGE_FILE_SUPPORT:
+            self.mem_file=open("/proc/" + str(self.pid) + "/mem", 'rb', 0)
+        else:
+            path=create_string_buffer("/proc/" + str(self.pid) + "/mem")
+            self.mem_file=open64(byref(path), os.O_RDONLY)
 
     @staticmethod
     def list():
@@ -267,22 +278,16 @@ class LinProcess(BaseProcess):
         if self.read_ptrace:
             self.ptrace_attach()
         data=b''
-        if not LARGE_FILE_SUPPORT or int(address)<2**32:
-            with open("/proc/" + str(self.pid) + "/mem", 'rb', 0) as mem_file:
-                mem_file.seek(address)
-                data=mem_file.read(bytes)
+        if not LARGE_FILE_SUPPORT:
+            mem_file.seek(address)
+            data=mem_file.read(bytes)
         else:
-            path=create_string_buffer("/proc/" + str(self.pid) + "/mem")
-            fd=open64(byref(path), os.O_RDONLY)
+            lseek64(self.mem_file, address, os.SEEK_SET)
+            data=b""
             try:
-                lseek64(fd, address, os.SEEK_SET)
-                data=b""
-                try:
-                    data=os.read(fd, bytes)
-                except Exception as e:
-                    logger.info("Error reading %s at %s: %s"%((bytes),address, e))
-            finally:
-                c_close(fd)
+                data=os.read(self.mem_file, bytes)
+            except Exception as e:
+                logger.info("Error reading %s at %s: %s"%((bytes),address, e))
         if self.read_ptrace:
             self.ptrace_detach()
         return data
