@@ -6,7 +6,7 @@ Python library using ctypes to search/edit windows/linux/OSX programs memory.
 pip install https://github.com/n1nj4sec/memorpy/archive/master.zip
 ```
 # usage examples :
-In this example open a notepad.exe (x32) and type in some text we will edit from memory !
+In this example open a notepad.exe and type in some text we will edit from memory !
 ```python
 >>> from memorpy import *
 >>> mw=MemWorker(pid=3856) #you can also select a process by its name with the kwarg name=
