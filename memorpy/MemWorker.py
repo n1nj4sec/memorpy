@@ -166,7 +166,7 @@ class MemWorker(object):
                 tmp.append((name, regex))
             value = tmp
 
-        elif ftype != 'match' and ftype != 'group' and ftype != 're' and ftype != 'groups' and ftype!='ngroups':
+        elif ftype != 'match' and ftype != 'group' and ftype != 're' and ftype != 'groups' and ftype != 'ngroups' and ftype != 'lambda':
             structtype, structlen = utils.type_unpack(ftype)
             value = struct.pack(structtype, value)
 
@@ -182,7 +182,8 @@ class MemWorker(object):
 
         elif ftype == 'float':
             func = self.parse_float_function
-
+        elif ftype == 'lambda': # use a custm function
+            func = value
         else:
             func = self.parse_any_function
 
@@ -212,11 +213,16 @@ class MemWorker(object):
                 finally:
                     current_offset += chunk_size
                     chunk_read += chunk_size
+
             if chunk_exc:
                 continue
 
             if b:
-                for res in func(b, value, offset):
-                    yield res
+                if ftype=="lambda":
+                    for res in func(b, offset):
+                        yield res
+                else:
+                    for res in func(b, value, offset):
+                        yield res
 
 
