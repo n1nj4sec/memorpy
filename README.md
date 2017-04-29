@@ -1,5 +1,5 @@
 # memorpy
-Python library using ctypes to search/edit windows and linux programs memory. Some functions are not implemented as I only implemented what I needed at the time I wrote this ;) But the basic functions should works just fine
+Python library using ctypes to search/edit windows/linux/OSX programs memory.
 
 # install
 ```
