@@ -23,6 +23,16 @@ else:
     ULONG_PTR = c_ulong
 
 
+class SECURITY_DESCRIPTOR(Structure): 
+    _fields_ = [
+        ('SID', DWORD),
+        ('group', DWORD),
+        ('dacl', DWORD),
+        ('sacl', DWORD),
+        ('test', DWORD)
+    ]
+PSECURITY_DESCRIPTOR = POINTER(SECURITY_DESCRIPTOR)
+
 class MEMORY_BASIC_INFORMATION(Structure):
     _fields_ = [('BaseAddress', c_void_p),
      ('AllocationBase', c_void_p),
@@ -176,3 +186,5 @@ MEM_COMMIT = 4096
 MEM_FREE = 65536
 MEM_RESERVE = 8192
 
+UNPROTECTED_DACL_SECURITY_INFORMATION = 536870912
+DACL_SECURITY_INFORMATION = 4
