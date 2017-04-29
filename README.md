@@ -100,6 +100,8 @@ Now you have infinite ammo :o)
 I hope this code will be useful to someone.
 
 Have fun !
+## Other examples
+Have a look at [mimipy](https://github.com/n1nj4sec/mimipy) that dumps passwords from various processes memory
 
 ## Contact
 by mail: contact@n1nj4.eu  
