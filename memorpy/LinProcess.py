@@ -135,6 +135,7 @@ class LinProcess(BaseProcess):
                 self.mem_file.close()
             else:
                 c_close(self.mem_file)
+            self.mem_file=None
         if self.ptrace_started:
             self.ptrace_detach()
 
@@ -214,6 +215,8 @@ class LinProcess(BaseProcess):
         with open("/proc/" + str(self.pid) + "/maps", 'r') as maps_file:
             for line in maps_file:
                 m = re.match(r'([0-9A-Fa-f]+)-([0-9A-Fa-f]+)\s+([-rwpsx]+)\s+([0-9A-Fa-f]+)\s+([0-9A-Fa-f]+:[0-9A-Fa-f]+)\s+([0-9]+)\s*(.*)', line)
+                if not m:
+                    continue
                 start, end, region_protec, offset, dev, inode, pathname = int(m.group(1), 16), int(m.group(2), 16), m.group(3), m.group(4), m.group(5), int(m.group(6)), m.group(7)
                 if start_offset is not None:
                     if start < start_offset:
