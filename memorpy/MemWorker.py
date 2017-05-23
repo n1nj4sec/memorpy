@@ -21,6 +21,7 @@ import Process
 import utils
 import struct
 from Address import Address
+from BaseProcess import ProcessException
 import traceback
 import binascii
 from structures import *
