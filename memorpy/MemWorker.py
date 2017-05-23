@@ -43,12 +43,6 @@ class MemWorker(object):
         """ wrapper to instanciate an Address class for the memworker.process"""
         return Address(value, process=self.process, default_type=default_type)
 
-    def search_address(self, address):
-        address = int(address)
-        for m in self.process.list_modules():
-            for addr in self.mem_search(address, ftype='ulong', start_offset=m.modBaseAddr, end_offset=m.modBaseSize):
-                logger.debug('found module %s => addr %s' % (m.szModule, addr))
-
     def umem_replace(self, regex, replace):
         """ like search_replace_mem but works with unicode strings """
         regex = utils.re_to_unicode(regex)
@@ -58,7 +52,7 @@ class MemWorker(object):
     def mem_replace(self, regex, replace):
         """ search memory for a pattern and replace all found occurrences """
         allWritesSucceed = True
-        for start_offset in self.mem_search(regex, ftype='re'):
+        for _, start_offset in self.mem_search(regex, ftype='re'):
             if self.process.write_bytes(start_offset, replace) == 1:
                 logger.debug('Write at offset %s succeeded !' % start_offset)
             else:
@@ -70,7 +64,7 @@ class MemWorker(object):
     def umem_search(self, regex):
         """ like mem_search but works with unicode strings """
         regex = utils.re_to_unicode(regex)
-        for i in self.mem_search(str(regex), ftype='re'):
+        for _, i in self.mem_search(str(regex), ftype='re'):
             yield i
 
     def group_search(self, group, start_offset = None, end_offset = None):
@@ -91,7 +85,8 @@ class MemWorker(object):
         for i in range(len(a) - 2, -1, -2):
             regex += binascii.unhexlify(a[i:i + 2])
 
-        return self.mem_search(re.escape(regex), ftype='re')
+        for _, a in self.mem_search(re.escape(regex), ftype='re'):
+            yield a
 
     def parse_re_function(self, b, value, offset):
         for name, regex in value:
