@@ -48,6 +48,12 @@ def type_unpack(type):
     elif type == 'ulong':
         s = 'L'
         l = 4
+    elif type == 'longlong':
+        s = 'q'
+        l = 8
+    elif type == 'ulonglong':
+        s = 'Q'
+        l = 8
     elif type == 'float':
         s = 'f'
         l = 4
