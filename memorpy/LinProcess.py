@@ -144,11 +144,12 @@ class LinProcess(BaseProcess):
 
     def _open(self):
         self.isProcessOpen = True
-        self.check_ptrace_scope()
-        if os.getuid()!=0:
-            #to raise an exception if ptrace is not allowed
-            self.ptrace_attach()
-            self.ptrace_detach()
+        if self.read_ptrace:
+          self.check_ptrace_scope()
+          if os.getuid()!=0:
+              #to raise an exception if ptrace is not allowed
+              self.ptrace_attach()
+              self.ptrace_detach()
 
         #open file descriptor
         if not LARGE_FILE_SUPPORT:
@@ -250,7 +251,7 @@ class LinProcess(BaseProcess):
         return res
 
     def write_bytes(self, address, data):
-        if not self.ptrace_started:
+        if self.read_ptrace and not self.ptrace_started:
             self.ptrace_attach()
 
         c_pid = c_pid_t(self.pid)
@@ -274,7 +275,8 @@ class LinProcess(BaseProcess):
                 error=errno.errorcode.get(ctypes.get_errno(), 'UNKNOWN')
                 raise OSError("Error using PTRACE_POKEDATA: %s"%error)
 
-        self.ptrace_detach()
+        if self.read_ptrace:
+            self.ptrace_detach()
         return True
 
     def read_bytes(self, address, bytes = 4):
