@@ -80,10 +80,10 @@ class LinProcess(BaseProcess):
         else:
             raise ValueError("You need to instanciate process with at least a name or a pid")
         if ptrace is None:
-            if os.getuid()==0:
-                self.read_ptrace=False # no need to ptrace the process when root to read memory
-            else:
-                self.read_ptrace=True
+            # no need to ptrace the process when root to read memory
+            self.read_ptrace = os.getuid() != 0
+        else:
+            self.read_ptrace = ptrace
         self._open()
 
     def check_ptrace_scope(self):
