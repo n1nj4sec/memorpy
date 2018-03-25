@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with memorpy.  If not, see <http://www.gnu.org/licenses/>.
 
-from ctypes import pointer, sizeof, windll, create_string_buffer, c_ulong, byref, GetLastError, c_bool, WinError
+from ctypes import Structure, pointer, sizeof, windll, create_string_buffer, c_ulong, byref, GetLastError, c_bool, WinError
 from structures import *
 import copy
 import struct
@@ -22,15 +22,8 @@ import utils
 import platform
 from BaseProcess import BaseProcess, ProcessException
 
-psapi       = windll.psapi
 kernel32    = windll.kernel32
 advapi32    = windll.advapi32
-
-IsWow64Process=None
-if hasattr(kernel32,'IsWow64Process'):
-    IsWow64Process=kernel32.IsWow64Process
-    IsWow64Process.restype = c_bool
-    IsWow64Process.argtypes = [c_void_p, POINTER(c_bool)]
 
 class WinProcess(BaseProcess):
 
@@ -69,30 +62,28 @@ class WinProcess(BaseProcess):
 
     @staticmethod
     def list():
-        processes=[]
-        arr = c_ulong * 256
-        lpidProcess= arr()
-        cb = sizeof(lpidProcess)
-        cbNeeded = c_ulong()
-        hModule = c_ulong()
-        count = c_ulong()
-        modname = create_string_buffer(100)
-        PROCESS_QUERY_INFORMATION = 0x0400
-        PROCESS_VM_READ = 0x0010
-
-        psapi.EnumProcesses(byref(lpidProcess), cb, byref(cbNeeded))
-        nReturned = cbNeeded.value/sizeof(c_ulong())
-
-        pidProcess = [i for i in lpidProcess][:nReturned]
-        for pid in pidProcess:
-            proc={ "pid": int(pid) }
-            hProcess = kernel32.OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, False, pid)
-            if hProcess:
-                psapi.EnumProcessModules(hProcess, byref(hModule), sizeof(hModule), byref(count))
-                psapi.GetModuleBaseNameA(hProcess, hModule.value, modname, sizeof(modname))
-                proc["name"]=modname.value
-                kernel32.CloseHandle(hProcess)
-            processes.append(proc)
+        processes       = []
+        hProcessSnap    = c_void_p(0)
+        hProcessSnap    = CreateToolhelp32Snapshot(TH32CS_CLASS.SNAPPROCESS, 0)
+        pe32            = PROCESSENTRY32()
+        pe32.dwSize     = sizeof(PROCESSENTRY32)
+        ret             = Process32First(hProcessSnap, pointer(pe32))
+        
+        while ret:
+            hProcess        = OpenProcess(PROCESS_ALL_ACCESS, 0, pe32.th32ProcessID)
+            dwPriorityClass = GetPriorityClass(hProcess)
+            if dwPriorityClass == 0:
+                CloseHandle(hProcess)
+            pid = pe32.th32ProcessID
+            ret = Process32Next(hProcessSnap, pointer(pe32))
+            # print '{name} / {pid}'.format(name=pe32.szExeFile, pid=pid)
+            processes.append(
+                { 
+                    'pid'   : int(pid), 
+                    'name'  : pe32.szExeFile
+                }
+            )
+        CloseHandle(hProcessSnap)
         return processes
 
     @staticmethod
@@ -122,11 +113,11 @@ class WinProcess(BaseProcess):
             ppSacl                  = DWORD()
             ppSecurityDescriptor    = SECURITY_DESCRIPTOR()
 
-            process = kernel32.OpenProcess(262144, 0, dwProcessId)
+            process = OpenProcess(262144, 0, dwProcessId)
             advapi32.GetSecurityInfo(kernel32.GetCurrentProcess(), 6, 0, byref(ppsidOwner), byref(ppsidGroup), byref(ppDacl), byref(ppSacl), byref(ppSecurityDescriptor))
             advapi32.SetSecurityInfo(process, 6, DACL_SECURITY_INFORMATION | UNPROTECTED_DACL_SECURITY_INFORMATION, None, None, ppSecurityDescriptor.dacl, ppSecurityDescriptor.group)
-            kernel32.CloseHandle(process)
-        self.h_process = kernel32.OpenProcess(2035711, 0, dwProcessId)
+            CloseHandle(process)
+        self.h_process = OpenProcess(2035711, 0, dwProcessId)
         if self.h_process is not None:
             self.isProcessOpen = True
             self.pid = dwProcessId
@@ -135,7 +126,7 @@ class WinProcess(BaseProcess):
 
     def close(self):
         if self.h_process is not None:
-            ret = kernel32.CloseHandle(self.h_process) == 1
+            ret = CloseHandle(self.h_process) == 1
             if ret:
                 self.h_process = None
                 self.pid = None
@@ -184,17 +175,17 @@ class WinProcess(BaseProcess):
 
     def iter_region(self, start_offset=None, end_offset=None, protec=None, optimizations=None):
         
-        offset = start_offset or self.min_addr
-        end_offset = end_offset or self.max_addr
+        offset      = start_offset or self.min_addr
+        end_offset  = end_offset or self.max_addr
 
         while True:
             if offset >= end_offset:
                 break
-            mbi = self.VirtualQueryEx(offset)
-            offset = mbi.BaseAddress
-            chunk = mbi.RegionSize
+            mbi     = self.VirtualQueryEx(offset)
+            offset  = mbi.BaseAddress
+            chunk   = mbi.RegionSize
             protect = mbi.Protect
-            state = mbi.State
+            state   = mbi.State
             #print "offset: %s, chunk:%s"%(offset, chunk)
             if state & MEM_FREE or state & MEM_RESERVE:
                 offset += chunk
@@ -211,10 +202,10 @@ class WinProcess(BaseProcess):
         if not self.isProcessOpen:
             raise ProcessException("Can't write_bytes(%s, %s), process %s is not open" % (address, data, self.pid))
         buffer = create_string_buffer(data)
-        sizeWriten = c_size_t(0)
-        bufferSize = sizeof(buffer) - 1
-        _address = address
-        _length = bufferSize + 1
+        sizeWriten  = c_size_t(0)
+        bufferSize  = sizeof(buffer) - 1
+        _address    = address
+        _length     = bufferSize + 1
         try:
             old_protect = self.VirtualProtectEx(_address, _length, PAGE_EXECUTE_READWRITE)
         except:
@@ -237,25 +228,26 @@ class WinProcess(BaseProcess):
         else:
             RpM = ReadProcessMemory
 
-        address = int(address)
-        buffer = create_string_buffer(bytes)
-        bytesread = c_size_t(0)
-        data = ''
-        length = bytes
+        address     = int(address)
+        buffer      = create_string_buffer(bytes)
+        bytesread   = c_size_t(0)
+        data        = ''
+        length      = bytes
         while length:
             if RpM(self.h_process, address, buffer, bytes, byref(bytesread)) or (use_NtWow64ReadVirtualMemory64 and GetLastError() == 0):
                 if bytesread.value:
-                    data += buffer.raw[:bytesread.value]
-                    length -= bytesread.value
+                    data    += buffer.raw[:bytesread.value]
+                    length  -= bytesread.value
                     address += bytesread.value
                 if not len(data):
                     raise ProcessException('Error %s in ReadProcessMemory(%08x, %d, read=%d)' % (GetLastError(),
-                     address,
-                     length,
-                     bytesread.value))
+                        address,
+                        length,
+                        bytesread.value)
+                    )
                 return data
             else:
-                if GetLastError()==299: #only part of ReadProcessMemory has been done, let's return it
+                if GetLastError() == 299: #only part of ReadProcessMemory has been done, let's return it
                     data += buffer.raw[:bytesread.value]
                     return data
                 raise WinError()
@@ -270,7 +262,7 @@ class WinProcess(BaseProcess):
         if self.pid is not None:
             hModuleSnap = CreateToolhelp32Snapshot(TH32CS_CLASS.SNAPMODULE, self.pid)
             if hModuleSnap is not None:
-                module_entry = MODULEENTRY32()
+                module_entry        = MODULEENTRY32()
                 module_entry.dwSize = sizeof(module_entry)
                 success = Module32First(hModuleSnap, byref(module_entry))
                 while success:
@@ -278,7 +270,7 @@ class WinProcess(BaseProcess):
                         module_list.append(copy.copy(module_entry))
                     success = Module32Next(hModuleSnap, byref(module_entry))
 
-                kernel32.CloseHandle(hModuleSnap)
+                CloseHandle(hModuleSnap)
         return module_list
 
     def get_symbolic_name(self, address):
@@ -290,7 +282,7 @@ class WinProcess(BaseProcess):
 
     def hasModule(self, module):
         if module[-4:] != '.dll':
-            module += '.dll'
+            module  += '.dll'
         module_list = self.list_modules()
         for m in module_list:
             if module in m.szExePath.split('\\'):
