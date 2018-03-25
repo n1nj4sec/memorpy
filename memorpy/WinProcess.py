@@ -14,16 +14,11 @@
 # You should have received a copy of the GNU General Public License
 # along with memorpy.  If not, see <http://www.gnu.org/licenses/>.
 
-from ctypes import Structure, pointer, sizeof, windll, create_string_buffer, c_ulong, byref, GetLastError, c_bool, WinError
+from ctypes import pointer, sizeof, windll, create_string_buffer, c_ulong, byref, c_bool, WinError
 from structures import *
 import copy
-import struct
-import utils
 import platform
 from BaseProcess import BaseProcess, ProcessException
-
-kernel32    = windll.kernel32
-advapi32    = windll.advapi32
 
 class WinProcess(BaseProcess):
 
@@ -75,7 +70,6 @@ class WinProcess(BaseProcess):
             if dwPriorityClass == 0:
                 CloseHandle(hProcess)
             pid = pe32.th32ProcessID
-            ret = Process32Next(hProcessSnap, pointer(pe32))
             # print '{name} / {pid}'.format(name=pe32.szExeFile, pid=pid)
             processes.append(
                 { 
@@ -83,9 +77,10 @@ class WinProcess(BaseProcess):
                     'name'  : pe32.szExeFile
                 }
             )
+            ret = Process32Next(hProcessSnap, pointer(pe32))
         CloseHandle(hProcessSnap)
         return processes
-
+    
     @staticmethod
     def processes_from_name(processName):
         processes = []

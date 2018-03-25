@@ -132,6 +132,7 @@ class TH32CS_CLASS(object):
 kernel32    = windll.kernel32
 advapi32    = windll.advapi32
 ntdll       = windll.ntdll
+psapi       = windll.psapi
 
 #===============================================================================
 #                               Functions
@@ -171,7 +172,7 @@ OpenProcessToken.restype            = BOOL
 
 ReadProcessMemory                   = kernel32.ReadProcessMemory
 ReadProcessMemory.argtypes          = [HANDLE, LPCVOID, LPVOID, c_size_t, POINTER(c_size_t)]
-ReadProcessMemory.restype           = kernel32.ReadProcessMemory
+ReadProcessMemory.restype           = BOOL
 
 WriteProcessMemory                  = kernel32.WriteProcessMemory
 WriteProcessMemory.argtypes         = [HANDLE, LPVOID, LPCVOID, c_size_t, POINTER(c_size_t)]
@@ -181,6 +182,9 @@ GetPriorityClass                    = kernel32.GetPriorityClass
 GetPriorityClass.restype            = DWORD
 GetPriorityClass.argtypes           = [HANDLE]
 
+GetLastError                        = kernel32.GetLastError
+GetLastError.restype                = DWORD
+GetLastError.argtypes               = []
 
 if sizeof(c_void_p) == 8:
     NtWow64ReadVirtualMemory64 = None
