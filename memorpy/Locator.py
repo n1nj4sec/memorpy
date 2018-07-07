@@ -16,7 +16,7 @@
 
 import copy
 import time
-from Address import Address
+from .Address import Address
 import struct
 
 class Locator(object):

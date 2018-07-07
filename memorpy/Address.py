@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with memorpy.  If not, see <http://www.gnu.org/licenses/>.
 
-import utils
+import memorpy.utils as utils
 
 class AddressException(Exception):
     pass
@@ -58,7 +58,7 @@ class Address(object):
 
     def dump(self, ftype = 'bytes', size = 512, before = 32):
         buf = self.process.read_bytes(self.value - before, size)
-        print utils.hex_dump(buf, self.value - before, ftype=ftype)
+        print(utils.hex_dump(buf, self.value - before, ftype=ftype))
 
     def __nonzero__(self):
         return self.value is not None and self.value != 0
@@ -77,7 +77,7 @@ class Address(object):
     def __str__(self):
         if not self.symbolic_name:
             self.symbolic_name = self.symbol()
-        return str('<Addr: %s' % self.symbolic_name + ' : "%s" (%s)>' % (str(self.read()).encode('string_escape'), self.default_type))
+        return str('<Addr: %s' % self.symbolic_name + ' : "%s" (%s)>' % (str(self.read()).encode('unicode_escape'), self.default_type))
 
     def __int__(self):
         return int(self.value)

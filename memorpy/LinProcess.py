@@ -16,15 +16,15 @@
 
 import copy
 import struct
-import utils
+import memorpy.utils
 import platform
 import ctypes, re, sys
 from ctypes import create_string_buffer, byref, c_int, c_void_p, c_long, c_size_t, c_ssize_t, POINTER, get_errno
 import errno
 import os
 import signal
-from BaseProcess import BaseProcess, ProcessException
-from structures import *
+from .BaseProcess import BaseProcess, ProcessException
+from .structures import *
 import logging
 
 logger = logging.getLogger('memorpy')

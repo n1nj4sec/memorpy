@@ -23,10 +23,10 @@ ch.setLevel(logging.WARNING)
 logger.addHandler(ch)
 
 import sys
-from MemWorker import *
-from Locator import *
-from Address import *
-from Process import *
-from utils import *
+from .MemWorker import *
+from .Locator import *
+from .Address import *
+from .Process import *
+from .utils import *
 #if sys.platform=="win32":
 #    from wintools import *  #not a necessary dependency, just used for debugging

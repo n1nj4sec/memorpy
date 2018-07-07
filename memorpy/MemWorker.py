@@ -17,14 +17,14 @@ import sys
 import string
 import re
 import logging
-import Process
-import utils
+import memorpy.Process as Process
+import memorpy.utils as utils
 import struct
-from Address import Address
-from BaseProcess import ProcessException
+from .Address import Address
+from .BaseProcess import ProcessException
 import traceback
 import binascii
-from structures import *
+from .structures import *
 
 logger = logging.getLogger('memorpy')
 
@@ -195,7 +195,7 @@ class MemWorker(object):
                 try:
                     b += self.process.read_bytes(current_offset, chunk_size)
                 except IOError as e:
-                    print traceback.format_exc()
+                    print(traceback.format_exc())
                     if e.errno == 13:
                         raise
                     else:

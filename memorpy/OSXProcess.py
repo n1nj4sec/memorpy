@@ -16,15 +16,15 @@
 
 import copy
 import struct
-import utils
+import memorpy.utils
 import platform
 import ctypes, re, sys
 import ctypes.util
 import errno
 import os
 import signal
-from BaseProcess import BaseProcess, ProcessException
-from structures import *
+from .BaseProcess import BaseProcess, ProcessException
+from .structures import *
 import logging
 import subprocess
 

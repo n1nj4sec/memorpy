@@ -15,12 +15,12 @@
 # along with memorpy.  If not, see <http://www.gnu.org/licenses/>.
 
 from ctypes import pointer, sizeof, windll, create_string_buffer, c_ulong, byref, GetLastError, c_bool, WinError
-from structures import *
+from .structures import *
 import copy
 import struct
-import utils
+import memorpy.utils
 import platform
-from BaseProcess import BaseProcess, ProcessException
+from .BaseProcess import BaseProcess, ProcessException
 
 psapi       = windll.psapi
 kernel32    = windll.kernel32
@@ -240,7 +240,7 @@ class WinProcess(BaseProcess):
         address = int(address)
         buffer = create_string_buffer(bytes)
         bytesread = c_size_t(0)
-        data = ''
+        data = b''
         length = bytes
         while length:
             if RpM(self.h_process, address, buffer, bytes, byref(bytesread)) or (use_NtWow64ReadVirtualMemory64 and GetLastError() == 0):
