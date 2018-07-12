@@ -187,7 +187,7 @@ class MemWorker(object):
             raise ProcessException("Can't read_bytes, process %s is not open" % (self.process.pid))
 
         for offset, chunk_size in self.process.iter_region(start_offset=start_offset, end_offset=end_offset, protec=protec, optimizations=optimizations):
-            b = ''
+            b = b''
             current_offset = offset
             chunk_read = 0
             chunk_exc = False
