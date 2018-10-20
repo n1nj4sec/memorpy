@@ -98,7 +98,7 @@ class OSXProcess(BaseProcess):
     @staticmethod
     def pid_from_name(name):
         for dic in OSXProcess.list():
-            if name in dic['exe']:
+            if name in dic['name']:
                 return dic['pid']
 
 
