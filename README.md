@@ -12,8 +12,8 @@ In this example open a notepad.exe and type in some text we will edit from memor
 >>> mw=MemWorker(pid=3856) #you can also select a process by its name with the kwarg name=
 >>> l=[x for x in mw.umem_search("hello")]
 >>> l
-[('', <Addr: 0x003287B0>)]
->>> a=l[0][1]
+[<Addr: 0x003287B0>]
+>>> a=l[0]
 >>> a
 <Addr: 0x003287B0>
 >>> a+4
