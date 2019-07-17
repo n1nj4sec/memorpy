@@ -17,10 +17,11 @@
 import re
 import struct
 
+
 def re_to_unicode(s):
-    newstring = ''
+    newstring = ""
     for c in s:
-        newstring += re.escape(c) + '\\x00'
+        newstring += re.escape(c) + "\\x00"
 
     return newstring
 
@@ -30,92 +31,92 @@ def type_unpack(type):
     type = type.lower()
     s = None
     l = None
-    if type == 'short':
-        s = 'h'
+    if type == "short":
+        s = "h"
         l = 2
-    elif type == 'ushort':
-        s = 'H'
+    elif type == "ushort":
+        s = "H"
         l = 2
-    elif type == 'int':
-        s = 'i'
+    elif type == "int":
+        s = "i"
         l = 4
-    elif type == 'uint':
-        s = 'I'
+    elif type == "uint":
+        s = "I"
         l = 4
-    elif type == 'long':
-        s = 'l'
+    elif type == "long":
+        s = "l"
         l = 4
-    elif type == 'ulong':
-        s = 'L'
+    elif type == "ulong":
+        s = "L"
         l = 4
-    elif type == 'float':
-        s = 'f'
+    elif type == "float":
+        s = "f"
         l = 4
-    elif type == 'double':
-        s = 'd'
+    elif type == "double":
+        s = "d"
         l = 8
     else:
-        raise TypeError('Unknown type %s' % type)
-    return ('<' + s, l)
+        raise TypeError("Unknown type %s" % type)
+    return ("<" + s, l)
 
 
-def hex_dump(data, addr = 0, prefix = '', ftype = 'bytes'):
+def hex_dump(data, addr=0, prefix="", ftype="bytes"):
     """
     function originally from pydbg, modified to display other types
     """
     dump = prefix
-    slice = ''
-    if ftype != 'bytes':
+    slice = ""
+    if ftype != "bytes":
         structtype, structlen = type_unpack(ftype)
         for i in range(0, len(data), structlen):
             if addr % 16 == 0:
-                dump += ' '
+                dump += " "
                 for char in slice:
                     if ord(char) >= 32 and ord(char) <= 126:
                         dump += char
                     else:
-                        dump += '.'
+                        dump += "."
 
-                dump += '\n%s%08X: ' % (prefix, addr)
-                slice = ''
-            tmpval = 'NaN'
+                dump += "\n%s%08X: " % (prefix, addr)
+                slice = ""
+            tmpval = "NaN"
             try:
-                packedval = data[i:i + structlen]
+                packedval = data[i : i + structlen]
                 tmpval = struct.unpack(structtype, packedval)[0]
             except Exception as e:
                 print(e)
 
-            if tmpval == 'NaN':
-                dump += '{:<15} '.format(tmpval)
-            elif ftype == 'float':
-                dump += '{:<15.4f} '.format(tmpval)
+            if tmpval == "NaN":
+                dump += "{:<15} ".format(tmpval)
+            elif ftype == "float":
+                dump += "{:<15.4f} ".format(tmpval)
             else:
-                dump += '{:<15} '.format(tmpval)
+                dump += "{:<15} ".format(tmpval)
             addr += structlen
 
     else:
         for byte in data:
             if addr % 16 == 0:
-                dump += ' '
+                dump += " "
                 for char in slice:
                     if ord(char) >= 32 and ord(char) <= 126:
                         dump += char
                     else:
-                        dump += '.'
+                        dump += "."
 
-                dump += '\n%s%08X: ' % (prefix, addr)
-                slice = ''
-            dump += '%02X ' % ord(byte)
+                dump += "\n%s%08X: " % (prefix, addr)
+                slice = ""
+            dump += "%02X " % ord(byte)
             slice += byte
             addr += 1
 
     remainder = addr % 16
     if remainder != 0:
-        dump += '   ' * (16 - remainder) + ' '
+        dump += "   " * (16 - remainder) + " "
     for char in slice:
         if ord(char) >= 32 and ord(char) <= 126:
             dump += char
         else:
-            dump += '.'
+            dump += "."
 
-    return dump + '\n'
+    return dump + "\n"

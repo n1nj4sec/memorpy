@@ -28,14 +28,15 @@ from .Address import Address
 from .BaseProcess import ProcessException
 from .WinStructures import *
 
-logger = logging.getLogger('memorpy')
+logger = logging.getLogger("memorpy")
 
-REGEX_TYPE=type(re.compile("^plop$"))
+REGEX_TYPE = type(re.compile("^plop$"))
 
 
 class MemWorker:
-
-    def __init__(self, pid=None, name=None, end_offset = None, start_offset = None, debug=True):
+    def __init__(
+        self, pid=None, name=None, end_offset=None, start_offset=None, debug=True
+    ):
         self.process = Process.Process(name=name, pid=pid, debug=debug)
 
     def __enter__(self):
@@ -44,59 +45,61 @@ class MemWorker:
     def __exit__(self, type, value, traceback):
         self.process.close()
 
-    def Address(self, value, default_type = 'uint'):
+    def Address(self, value, default_type="uint"):
         """ wrapper to instanciate an Address class for the memworker.process"""
         return Address(value, process=self.process, default_type=default_type)
 
     def umem_replace(self, regex, replace):
         """ like search_replace_mem but works with unicode strings """
         regex = utils.re_to_unicode(regex)
-        replace = replace.encode('utf-16-le')
+        replace = replace.encode("utf-16-le")
         return self.mem_replace(re.compile(regex, re.UNICODE), replace)
 
     def mem_replace(self, regex, replace):
         """ search memory for a pattern and replace all found occurrences """
         allWritesSucceed = True
-        for _, start_offset in self.mem_search(regex, ftype='re'):
+        for _, start_offset in self.mem_search(regex, ftype="re"):
             if self.process.write_bytes(start_offset, replace) == 1:
-                logger.debug('Write at offset %s succeeded !' % start_offset)
+                logger.debug("Write at offset %s succeeded !" % start_offset)
             else:
                 allWritesSucceed = False
-                logger.debug('Write at offset %s failed !' % start_offset)
+                logger.debug("Write at offset %s failed !" % start_offset)
 
         return allWritesSucceed
 
     def umem_search(self, regex):
         """ like mem_search but works with unicode strings """
         regex = utils.re_to_unicode(regex)
-        for _, i in self.mem_search(str(regex), ftype='re'):
+        for _, i in self.mem_search(str(regex), ftype="re"):
             yield i
 
-    def group_search(self, group, start_offset = None, end_offset = None):
-        regex = ''
+    def group_search(self, group, start_offset=None, end_offset=None):
+        regex = ""
         for value, type in group:
-            if type == 'f' or type == 'float':
-                f = struct.pack('<f', float(value))
-                regex += '..' + f[2:4]
+            if type == "f" or type == "float":
+                f = struct.pack("<f", float(value))
+                regex += ".." + f[2:4]
             else:
-                raise NotImplementedError('unknown type %s' % type)
+                raise NotImplementedError("unknown type %s" % type)
 
-        return self.mem_search(regex, ftype='re', start_offset=start_offset, end_offset=end_offset)
+        return self.mem_search(
+            regex, ftype="re", start_offset=start_offset, end_offset=end_offset
+        )
 
     def search_address(self, addr):
-        a = '%08X' % addr
-        logger.debug('searching address %s' % a)
-        regex = ''
+        a = "%08X" % addr
+        logger.debug("searching address %s" % a)
+        regex = ""
         for i in range(len(a) - 2, -1, -2):
-            regex += binascii.unhexlify(a[i:i + 2])
+            regex += binascii.unhexlify(a[i : i + 2])
 
-        for _, a in self.mem_search(re.escape(regex), ftype='re'):
+        for _, a in self.mem_search(re.escape(regex), ftype="re"):
             yield a
 
     def parse_re_function(self, b, value, offset):
         for name, regex in value:
             for res in regex.finditer(str(b)):
-                yield name, self.Address(offset+res.start(), 'bytes')
+                yield name, self.Address(offset + res.start(), "bytes")
                 """
                 index = b.find(res)
                 while index != -1:
@@ -110,11 +113,11 @@ class MemWorker:
     def parse_float_function(self, b, value, offset):
         for index in range(0, len(b)):
             try:
-                structtype, structlen = utils.type_unpack('float')
-                tmpval = struct.unpack(structtype, b[index:index + 4])[0]
+                structtype, structlen = utils.type_unpack("float")
+                tmpval = struct.unpack(structtype, b[index : index + 4])[0]
                 if int(value) == int(tmpval):
                     soffset = offset + index
-                    yield self.Address(soffset, 'float')
+                    yield self.Address(soffset, "float")
             except Exception as e:
                 pass
 
@@ -132,16 +135,24 @@ class MemWorker:
         index = b.find(value)
         while index != -1:
             soffset = offset + index
-            yield self.Address(soffset, 'bytes')
+            yield self.Address(soffset, "bytes")
             index = b.find(value, index + 1)
 
-    def mem_search(self, value, ftype = 'match', protec = PAGE_READWRITE | PAGE_READONLY, optimizations=None, start_offset = None, end_offset = None):
+    def mem_search(
+        self,
+        value,
+        ftype="match",
+        protec=PAGE_READWRITE | PAGE_READONLY,
+        optimizations=None,
+        start_offset=None,
+        end_offset=None,
+    ):
         """
                 iterator returning all indexes where the pattern has been found
         """
 
         # pre-compile regex to run faster
-        if ftype == 're' or ftype == 'groups' or ftype == 'ngroups':
+        if ftype == "re" or ftype == "groups" or ftype == "ngroups":
 
             # value should be an array of regex
             if type(value) is not list:
@@ -154,44 +165,57 @@ class MemWorker:
                     if type(reg[1]) != REGEX_TYPE:
                         regex = re.compile(reg[1], re.IGNORECASE)
                     else:
-                        regex=reg[1]
+                        regex = reg[1]
                 elif type(reg) == REGEX_TYPE:
-                    name = ''
-                    regex=reg
+                    name = ""
+                    regex = reg
                 else:
-                    name = ''
+                    name = ""
                     regex = re.compile(reg, re.IGNORECASE)
-
 
                 tmp.append((name, regex))
             value = tmp
 
-        elif ftype != 'match' and ftype != 'group' and ftype != 're' and ftype != 'groups' and ftype != 'ngroups' and ftype != 'lambda':
+        elif (
+            ftype != "match"
+            and ftype != "group"
+            and ftype != "re"
+            and ftype != "groups"
+            and ftype != "ngroups"
+            and ftype != "lambda"
+        ):
             structtype, structlen = utils.type_unpack(ftype)
             value = struct.pack(structtype, value)
 
         # different functions avoid if statement before parsing the buffer
-        if ftype == 're':
+        if ftype == "re":
             func = self.parse_re_function
 
-        elif ftype == 'groups':
+        elif ftype == "groups":
             func = self.parse_groups_function
 
-        elif ftype == 'ngroups':
+        elif ftype == "ngroups":
             func = self.parse_named_groups_function
 
-        elif ftype == 'float':
+        elif ftype == "float":
             func = self.parse_float_function
-        elif ftype == 'lambda': # use a custm function
+        elif ftype == "lambda":  # use a custm function
             func = value
         else:
             func = self.parse_any_function
 
         if not self.process.isProcessOpen:
-            raise ProcessException("Can't read_bytes, process %s is not open" % (self.process.pid))
+            raise ProcessException(
+                "Can't read_bytes, process %s is not open" % (self.process.pid)
+            )
 
-        for offset, chunk_size in self.process.iter_region(start_offset=start_offset, end_offset=end_offset, protec=protec, optimizations=optimizations):
-            b = b''
+        for offset, chunk_size in self.process.iter_region(
+            start_offset=start_offset,
+            end_offset=end_offset,
+            protec=protec,
+            optimizations=optimizations,
+        ):
+            b = b""
             current_offset = offset
             chunk_read = 0
             chunk_exc = False
@@ -204,7 +228,7 @@ class MemWorker:
                         raise
                     else:
                         logger.warning(e)
-                    chunk_exc=True
+                    chunk_exc = True
                     break
                 except Exception as e:
                     logger.warning(e)
@@ -218,11 +242,9 @@ class MemWorker:
                 continue
 
             if b:
-                if ftype=="lambda":
+                if ftype == "lambda":
                     for res in func(b, offset):
                         yield res
                 else:
                     for res in func(b, value, offset):
                         yield res
-
-

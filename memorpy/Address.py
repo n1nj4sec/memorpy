@@ -16,6 +16,7 @@
 
 from . import utils
 
+
 class AddressException(Exception):
     pass
 
@@ -23,13 +24,13 @@ class AddressException(Exception):
 class Address:
     """this class is used to have better representation of memory addresses"""
 
-    def __init__(self, value, process, default_type = 'uint'):
+    def __init__(self, value, process, default_type="uint"):
         self.value = int(value)
         self.process = process
         self.default_type = default_type
         self.symbolic_name = None
 
-    def read(self, type = None, maxlen = None, errors='raise'):
+    def read(self, type=None, maxlen=None, errors="raise"):
         if maxlen is None:
             try:
                 int(type)
@@ -43,9 +44,11 @@ class Address:
         if not maxlen:
             return self.process.read(self.value, type=type, errors=errors)
         else:
-            return self.process.read(self.value, type=type, maxlen=maxlen, errors=errors)
+            return self.process.read(
+                self.value, type=type, maxlen=maxlen, errors=errors
+            )
 
-    def write(self, data, type = None):
+    def write(self, data, type=None):
         if not type:
             type = self.default_type
         return self.process.write(self.value, data, type=type)
@@ -56,7 +59,7 @@ class Address:
     def get_instruction(self):
         return self.process.get_instruction(self.value)
 
-    def dump(self, ftype = 'bytes', size = 512, before = 32):
+    def dump(self, ftype="bytes", size=512, before=32):
         buf = self.process.read_bytes(self.value - before, size)
         print(utils.hex_dump(buf, self.value - before, ftype=ftype))
 
@@ -72,12 +75,16 @@ class Address:
     def __repr__(self):
         if not self.symbolic_name:
             self.symbolic_name = self.symbol()
-        return str('<Addr: %s' % self.symbolic_name + '>')
+        return str("<Addr: %s" % self.symbolic_name + ">")
 
     def __str__(self):
         if not self.symbolic_name:
             self.symbolic_name = self.symbol()
-        return str('<Addr: %s' % self.symbolic_name + ' : "%s" (%s)>' % (str(self.read()).encode('unicode_escape'), self.default_type))
+        return str(
+            "<Addr: %s" % self.symbolic_name
+            + ' : "%s" (%s)>'
+            % (str(self.read()).encode("unicode_escape"), self.default_type)
+        )
 
     def __int__(self):
         return int(self.value)
@@ -108,4 +115,3 @@ class Address:
 
     def __ge__(self, other):
         return self.value >= int(other)
-

@@ -16,11 +16,12 @@
 
 
 import logging
-logger=logging.getLogger("memorpy")
+
+logger = logging.getLogger("memorpy")
 logger.setLevel(logging.WARNING)
 ch = logging.StreamHandler()
 ch.setLevel(logging.WARNING)
 logger.addHandler(ch)
 
-#if sys.platform=="win32":
+# if sys.platform=="win32":
 #    from wintools import *  #not a necessary dependency, just used for debugging

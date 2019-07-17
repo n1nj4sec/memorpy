@@ -7,11 +7,12 @@ from .utils import type_unpack
 
 """ Base class for process not linked to any platform """
 
+
 class ProcessException(Exception):
     pass
 
-class BaseProcess:
 
+class BaseProcess:
     def __init__(self, *args, **kwargs):
         """ Create and Open a process object from its pid or from its name """
         self.h_process = None
@@ -32,34 +33,32 @@ class BaseProcess:
     def write_bytes(self, address, data):
         raise NotImplementedError
 
-    def read_bytes(self, address, bytes = 4):
+    def read_bytes(self, address, bytes=4):
         raise NotImplementedError
 
     def get_symbolic_name(self, address):
-        return '0x%08X' % int(address)
+        return "0x%08X" % int(address)
 
-    def read(self, address, type = 'uint', maxlen = 50, errors='raise'):
-        if type == 's' or type == 'string':
+    def read(self, address, type="uint", maxlen=50, errors="raise"):
+        if type == "s" or type == "string":
             s = self.read_bytes(int(address), bytes=maxlen)
-            news = ''
+            news = ""
             for c in s:
-                if c == '\x00':
+                if c == "\x00":
                     return news
                 news += c
-            if errors == 'ignore':
+            if errors == "ignore":
                 return news
-            raise ProcessException('string > maxlen')
+            raise ProcessException("string > maxlen")
         else:
-            if type == 'bytes' or type == 'b':
+            if type == "bytes" or type == "b":
                 return self.read_bytes(int(address), bytes=maxlen)
             s, l = type_unpack(type)
             return struct.unpack(s, self.read_bytes(int(address), bytes=l))[0]
 
-    def write(self, address, data, type = 'uint'):
-        if type != 'bytes':
+    def write(self, address, data, type="uint"):
+        if type != "bytes":
             s, l = type_unpack(type)
             return self.write_bytes(int(address), struct.pack(s, data))
         else:
             return self.write_bytes(int(address), data)
-
-
