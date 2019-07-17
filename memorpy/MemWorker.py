@@ -13,15 +13,12 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with memorpy.  If not, see <http://www.gnu.org/licenses/>.
+
 import sys
 import string
 import re
 import logging
-from . import Process
-from . import utils
 import struct
-from .Address import Address
-from .BaseProcess import ProcessException
 import traceback
 import binascii
 
