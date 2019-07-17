@@ -20,8 +20,8 @@ class AddressException(Exception):
     pass
 
 
-class Address(object):
-    """ this class is used to have better representation of memory addresses """
+class Address:
+    """this class is used to have better representation of memory addresses"""
 
     def __init__(self, value, process, default_type = 'uint'):
         self.value = int(value)

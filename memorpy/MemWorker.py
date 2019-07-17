@@ -31,7 +31,9 @@ from .WinStructures import *
 logger = logging.getLogger('memorpy')
 
 REGEX_TYPE=type(re.compile("^plop$"))
-class MemWorker(object):
+
+
+class MemWorker:
 
     def __init__(self, pid=None, name=None, end_offset = None, start_offset = None, debug=True):
         self.process = Process.Process(name=name, pid=pid, debug=debug)
@@ -134,17 +136,17 @@ class MemWorker(object):
             index = b.find(value, index + 1)
 
     def mem_search(self, value, ftype = 'match', protec = PAGE_READWRITE | PAGE_READONLY, optimizations=None, start_offset = None, end_offset = None):
-        """ 
+        """
                 iterator returning all indexes where the pattern has been found
         """
-        
+
         # pre-compile regex to run faster
         if ftype == 're' or ftype == 'groups' or ftype == 'ngroups':
-            
+
             # value should be an array of regex
             if type(value) is not list:
                 value = [value]
-            
+
             tmp = []
             for reg in value:
                 if type(reg) is tuple:
@@ -170,8 +172,8 @@ class MemWorker(object):
 
         # different functions avoid if statement before parsing the buffer
         if ftype == 're':
-            func = self.parse_re_function        
-        
+            func = self.parse_re_function
+
         elif ftype == 'groups':
             func = self.parse_groups_function
 
