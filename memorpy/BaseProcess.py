@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: UTF8 -*-
 
-import utils
+from . import utils
 import struct
 
 """ Base class for process not linked to any platform """

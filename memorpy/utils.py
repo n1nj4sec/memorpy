@@ -83,7 +83,7 @@ def hex_dump(data, addr = 0, prefix = '', ftype = 'bytes'):
                 packedval = data[i:i + structlen]
                 tmpval = struct.unpack(structtype, packedval)[0]
             except Exception as e:
-                print e
+                print(e)
 
             if tmpval == 'NaN':
                 dump += '{:<15} '.format(tmpval)

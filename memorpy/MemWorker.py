@@ -17,14 +17,14 @@ import sys
 import string
 import re
 import logging
-import Process
-import utils
+from . import Process
+from . import utils
 import struct
-from Address import Address
-from BaseProcess import ProcessException
+from .Address import Address
+from .BaseProcess import ProcessException
 import traceback
 import binascii
-from structures import *
+from .structures import *
 
 logger = logging.getLogger('memorpy')
 
@@ -91,7 +91,7 @@ class MemWorker(object):
 
     def parse_re_function(self, b, value, offset):
         for name, regex in value:
-            for res in regex.finditer(b):
+            for res in regex.finditer(str(b)):
                 yield name, self.Address(offset+res.start(), 'bytes')
                 """
                 index = b.find(res)
@@ -187,7 +187,7 @@ class MemWorker(object):
             raise ProcessException("Can't read_bytes, process %s is not open" % (self.process.pid))
 
         for offset, chunk_size in self.process.iter_region(start_offset=start_offset, end_offset=end_offset, protec=protec, optimizations=optimizations):
-            b = ''
+            b = b''
             current_offset = offset
             chunk_read = 0
             chunk_exc = False
@@ -195,7 +195,7 @@ class MemWorker(object):
                 try:
                     b += self.process.read_bytes(current_offset, chunk_size)
                 except IOError as e:
-                    print traceback.format_exc()
+                    print(traceback.format_exc())
                     if e.errno == 13:
                         raise
                     else:
