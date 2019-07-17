@@ -24,7 +24,12 @@ from .Address import Address
 from .BaseProcess import ProcessException
 import traceback
 import binascii
-from .structures import *
+
+from .WinProcess import WinProcess as Process
+from . import utils
+from .Address import Address
+from .BaseProcess import ProcessException
+from .WinStructures import *
 
 logger = logging.getLogger('memorpy')
 

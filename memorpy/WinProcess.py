@@ -15,7 +15,7 @@
 # along with memorpy.  If not, see <http://www.gnu.org/licenses/>.
 
 from ctypes import pointer, sizeof, windll, create_string_buffer, c_ulong, byref, GetLastError, c_bool, WinError
-from .structures import *
+from .WinStructures import *
 import copy
 import struct
 from . import utils
