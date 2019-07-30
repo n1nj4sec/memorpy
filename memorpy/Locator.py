@@ -16,6 +16,7 @@
 
 import copy
 from Address import Address
+from functools import reduce
 import struct
 
 
@@ -41,6 +42,14 @@ class Locator(object):
         self.last_value = None
         self.start = start
         self.end = end
+
+    def is_found(self):
+        return len(set(reduce(lambda x, y: x + y, self.last_iteration.values()))) == 1
+
+    def get_found(self):
+        if self.is_found():
+            return self.last_iteration.values()[0][0]
+        return None
 
     def find(self, value, erase_last = True):
         return self.feed(value, erase_last)

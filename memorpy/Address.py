@@ -63,6 +63,9 @@ class Address(object):
     def __nonzero__(self):
         return self.value is not None and self.value != 0
 
+    def __hash__(self):
+        return hash(self.value)
+
     def __add__(self, other):
         return Address(self.value + int(other), self.process, self.default_type)
 
